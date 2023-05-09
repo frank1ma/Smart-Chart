@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="navigator">
+    <file>adjust-60.png</file>
+    <file>arrow-left-60.png</file>
+    <file>arrow-right-60.png</file>
+    <file>drag-60.png</file>
+    <file>home-60.png</file>
+    <file>move-60.png</file>
+    <file>save-60.png</file>
+    <file>search-60.png</file>
+  </qresource>
+</RCC>
