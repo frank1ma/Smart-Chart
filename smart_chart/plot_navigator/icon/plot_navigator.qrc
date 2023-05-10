@@ -1,5 +1,7 @@
 <RCC>
   <qresource prefix="navigator">
+    <file>ruler-60.png</file>
+    <file>vertical-line-60.png</file>
     <file>adjust-60.png</file>
     <file>arrow-left-60.png</file>
     <file>arrow-right-60.png</file>

@@ -30,14 +30,47 @@ class MyChartView(QChartView):
         self.chart().legend().setAlignment(Qt.AlignBottom)
         self.chart().setTitle("My Chart")
         self.chart().createDefaultAxes()
+    
+    # setup navigator
+    def setupNavigator(self, navigator: PlotNavigator):
+        self.navigator = navigator
+    # def wheelEvent(self, event: QWheelEvent):
+    #     # zoom in or out using the mouse wheel
+    #     if event.angleDelta().y() > 0:
+    #         self.chart().zoomIn()
+    #     else:
+    #         self.chart().zoomOut()
+    #     QApplication.processEvents()
 
-    def wheelEvent(self, event: QWheelEvent):
-        # zoom in or out using the mouse wheel
-        if event.angleDelta().y() > 0:
-            self.chart().zoomIn()
-        else:
-            self.chart().zoomOut()
-        QApplication.processEvents()
+    # def mousePressEvent(self, event: QMouseEvent):
+    #     # start panning when the left mouse button is pressed
+    #     if event.button() == Qt.LeftButton:
+    #         chart_point = self.chart().mapToValue(event.position())
+    #         self.setDragMode(QChartView.ScrollHandDrag)
+    #         self.last_mouse_pos = chart_point
+    #         print(self.last_mouse_pos)
+    #     QApplication.processEvents()
+
+    # def mouseReleaseEvent(self, event: QMouseEvent):
+    #     # stop panning when the left mouse button is released
+    #     print("mouseReleaseEvent")
+    #     if event.button() == Qt.LeftButton:
+    #         self.setDragMode(QChartView.RubberBandDrag)
+    #         self.last_mouse_pos = None
+    #     QApplication.processEvents()
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self.navigator.chartMouseReleaseEvent(event)
+        return super().mouseReleaseEvent(event)
+
+    # def mouseMoveEvent(self, event: QMouseEvent):
+    #     if event.buttons() & Qt.LeftButton:
+    #         # pan the chart
+    #         chart_point = self.chart().mapToValue(event.position())
+    #         # pan the chart by the difference between the last mouse position and the current mouse position
+    #         delta = chart_point - self.last_mouse_pos
+    #         self.chart().scroll(-10*delta.x(), -10*delta.y())
+    #         # print the current min and max value of the horizontal axis of the chart
+    #         #print(self.chart().axes(Qt.Horizontal)[0].min(), self.chart().axes(Qt.Horizontal)[0].max())
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -52,7 +85,7 @@ class MainWindow(QMainWindow):
         # create a PlotNavigator object
 
         self.plot_navigator = PlotNavigator(self.chart_view)
-
+        self.chart_view.setupNavigator(self.plot_navigator)
         # set the layout of the QMainWindow
         self.setLayout(self.layout)
         # add the plot navigator to the layout

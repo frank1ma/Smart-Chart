@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'plot_navigatorviXRWR.ui'
+## Form generated from reading UI file 'plot_navigatoryTFbnR.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.5.0
 ##
@@ -15,17 +15,17 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QPushButton,
-    QSizePolicy, QWidget)
+from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
+    QPushButton, QSizePolicy, QWidget)
 from plot_navigator.icon import plot_navigator_rc
 
 class Ui_plot_navigator(object):
     def setupUi(self, plot_navigator):
         if not plot_navigator.objectName():
             plot_navigator.setObjectName(u"plot_navigator")
-        plot_navigator.resize(306, 50)
-        plot_navigator.setMinimumSize(QSize(306, 50))
-        plot_navigator.setMaximumSize(QSize(306, 50))
+        plot_navigator.resize(400, 50)
+        plot_navigator.setMinimumSize(QSize(400, 50))
+        plot_navigator.setMaximumSize(QSize(400, 50))
         self.horizontalLayout = QHBoxLayout(plot_navigator)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.origin_view_button = QPushButton(plot_navigator)
@@ -38,21 +38,21 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.origin_view_button)
 
-        self.prev_view_button = QPushButton(plot_navigator)
-        self.prev_view_button.setObjectName(u"prev_view_button")
-        self.prev_view_button.setMaximumSize(QSize(36, 16777215))
+        self.vertical_marker_button = QPushButton(plot_navigator)
+        self.vertical_marker_button.setObjectName(u"vertical_marker_button")
+        self.vertical_marker_button.setMaximumSize(QSize(36, 16777215))
         icon1 = QIcon()
-        icon1.addFile(u":/navigator/arrow-left-60.png", QSize(), QIcon.Normal, QIcon.Off)
-        self.prev_view_button.setIcon(icon1)
-        self.prev_view_button.setIconSize(QSize(24, 24))
+        icon1.addFile(u":/navigator/vertical-line-60.png", QSize(), QIcon.Normal, QIcon.Off)
+        self.vertical_marker_button.setIcon(icon1)
+        self.vertical_marker_button.setIconSize(QSize(24, 24))
 
-        self.horizontalLayout.addWidget(self.prev_view_button)
+        self.horizontalLayout.addWidget(self.vertical_marker_button)
 
         self.after_view_button = QPushButton(plot_navigator)
         self.after_view_button.setObjectName(u"after_view_button")
         self.after_view_button.setMaximumSize(QSize(36, 16777215))
         icon2 = QIcon()
-        icon2.addFile(u":/navigator/arrow-right-60.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon2.addFile(u":/navigator/ruler-60.png", QSize(), QIcon.Normal, QIcon.Off)
         self.after_view_button.setIcon(icon2)
         self.after_view_button.setIconSize(QSize(24, 24))
 
@@ -98,6 +98,11 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.save_button)
 
+        self.position_label = QLabel(plot_navigator)
+        self.position_label.setObjectName(u"position_label")
+
+        self.horizontalLayout.addWidget(self.position_label)
+
 
         self.retranslateUi(plot_navigator)
 
@@ -106,5 +111,6 @@ class Ui_plot_navigator(object):
 
     def retranslateUi(self, plot_navigator):
         plot_navigator.setWindowTitle(QCoreApplication.translate("plot_navigator", u"Frame", None))
+        self.position_label.setText("")
     # retranslateUi
 
