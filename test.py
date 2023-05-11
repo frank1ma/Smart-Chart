@@ -48,7 +48,7 @@ class MyMainWindow(QMainWindow):
 
         # add the chart view to the main window
         self.setCentralWidget(widget)
-
+        
     # enable zooming
     def enableZooming(self):
         #if button is pressed
@@ -68,7 +68,7 @@ class MyMainWindow(QMainWindow):
             self.chartView.setRenderHint(QPainter.Antialiasing)
             self.chartView.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, True)
             # enable the drag mode
-            self.chartView.setDragMode(QGraphicsView.ScrollHandDrag)
+            #self.chartView.setDragMode(QGraphicsView.ScrollHandDrag)
             # enable the pan mode
             self.chartView.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
 
