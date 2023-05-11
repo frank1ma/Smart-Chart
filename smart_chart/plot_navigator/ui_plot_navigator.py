@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'plot_navigatoryTFbnR.ui'
+## Form generated from reading UI file 'plot_navigatorCUhVnf.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.5.0
 ##
@@ -17,7 +17,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
     QPushButton, QSizePolicy, QWidget)
-from plot_navigator.icon import plot_navigator_rc
+
+from .custom_tool_button import CustomToolButton
+import plot_navigator_rc
 
 class Ui_plot_navigator(object):
     def setupUi(self, plot_navigator):
@@ -25,10 +27,10 @@ class Ui_plot_navigator(object):
             plot_navigator.setObjectName(u"plot_navigator")
         plot_navigator.resize(400, 50)
         plot_navigator.setMinimumSize(QSize(400, 50))
-        plot_navigator.setMaximumSize(QSize(400, 50))
+        plot_navigator.setMaximumSize(QSize(800, 50))
         self.horizontalLayout = QHBoxLayout(plot_navigator)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.origin_view_button = QPushButton(plot_navigator)
+        self.origin_view_button = CustomToolButton(plot_navigator)
         self.origin_view_button.setObjectName(u"origin_view_button")
         self.origin_view_button.setMaximumSize(QSize(36, 16777215))
         icon = QIcon()
@@ -38,7 +40,7 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.origin_view_button)
 
-        self.vertical_marker_button = QPushButton(plot_navigator)
+        self.vertical_marker_button = CustomToolButton(plot_navigator)
         self.vertical_marker_button.setObjectName(u"vertical_marker_button")
         self.vertical_marker_button.setMaximumSize(QSize(36, 16777215))
         icon1 = QIcon()
@@ -103,6 +105,11 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.position_label)
 
+        self.msg_label = QLabel(plot_navigator)
+        self.msg_label.setObjectName(u"msg_label")
+
+        self.horizontalLayout.addWidget(self.msg_label)
+
 
         self.retranslateUi(plot_navigator)
 
@@ -111,6 +118,9 @@ class Ui_plot_navigator(object):
 
     def retranslateUi(self, plot_navigator):
         plot_navigator.setWindowTitle(QCoreApplication.translate("plot_navigator", u"Frame", None))
+        self.origin_view_button.setText(QCoreApplication.translate("plot_navigator", u"...", None))
+        self.vertical_marker_button.setText(QCoreApplication.translate("plot_navigator", u"...", None))
         self.position_label.setText("")
+        self.msg_label.setText("")
     # retranslateUi
 

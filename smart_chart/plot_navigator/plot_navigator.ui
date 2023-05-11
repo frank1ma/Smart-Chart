@@ -18,7 +18,7 @@
   </property>
   <property name="maximumSize">
    <size>
-    <width>400</width>
+    <width>800</width>
     <height>50</height>
    </size>
   </property>
@@ -27,12 +27,15 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <widget class="QPushButton" name="origin_view_button">
+    <widget class="CustomToolButton" name="origin_view_button">
      <property name="maximumSize">
       <size>
        <width>36</width>
        <height>16777215</height>
       </size>
+     </property>
+     <property name="text">
+      <string>...</string>
      </property>
      <property name="icon">
       <iconset resource="icon/plot_navigator.qrc">
@@ -47,12 +50,15 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="vertical_marker_button">
+    <widget class="CustomToolButton" name="vertical_marker_button">
      <property name="maximumSize">
       <size>
        <width>36</width>
        <height>16777215</height>
       </size>
+     </property>
+     <property name="text">
+      <string>...</string>
      </property>
      <property name="icon">
       <iconset resource="icon/plot_navigator.qrc">
@@ -173,8 +179,22 @@
      </property>
     </widget>
    </item>
+   <item>
+    <widget class="QLabel" name="msg_label">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>CustomToolButton</class>
+   <extends>QToolButton</extends>
+   <header>.custom_tool_button</header>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="icon/plot_navigator.qrc"/>
  </resources>

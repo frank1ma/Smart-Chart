@@ -34,6 +34,7 @@ class MyChartView(QChartView):
         self.series.append(10, 5)
         self.chart().addSeries(self.series)
         self.chart().createDefaultAxes()
+        self.flag = True
         
 
 
@@ -41,38 +42,42 @@ class MyChartView(QChartView):
         self.last_mouse_pos = None
         self.chart_pos = None
 
-    def wheelEvent(self, event: QWheelEvent):
-        # zoom in or out using the mouse wheel
-        zoom_factor = 1.2
-        if event.angleDelta().y() > 0:
-            self.chart().zoomIn()
-        else:
-            self.chart().zoomOut()
-        QApplication.processEvents()
+    # def wheelEvent(self, event: QWheelEvent):
+    #     # zoom in or out using the mouse wheel
+    #     zoom_factor = 1.2
+    #     if event.angleDelta().y() > 0:
+    #         self.chart().zoomIn()
+    #     else:
+    #         self.chart().zoomOut()
+    #     QApplication.processEvents()
 
     def mousePressEvent(self, event: QMouseEvent):
-        # start panning when the left mouse button is pressed
+    #     # start panning when the left mouse button is pressed
         if event.button() == Qt.LeftButton:
             chart_point = self.chart().mapToValue(event.position())
             self.setDragMode(QChartView.ScrollHandDrag)
             self.last_mouse_pos = chart_point
             print(self.last_mouse_pos)
-        QApplication.processEvents()
+    #     #    pass
+        return super().mousePressEvent(event)
+    #     QApplication.processEvents()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        # stop panning when the left mouse button is released
-        if event.button() == Qt.LeftButton:
-            self.setDragMode(QChartView.RubberBandDrag)
+    # #     # stop panning when the left mouse button is released
+        if event.button() == Qt.LeftButton and self.flag == False:
+            self.setRubberBand(QChartView.RubberBand.NoRubberBand)
+            self.setDragMode(QChartView.NoDrag)
             self.last_mouse_pos = None
-        QApplication.processEvents()
+        else:
+            return super().mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        if event.buttons() & Qt.LeftButton:
-            # pan the chart
-            chart_point = self.chart().mapToValue(event.position())
-            # pan the chart by the difference between the last mouse position and the current mouse position
-            delta = chart_point - self.last_mouse_pos
-            self.chart().scroll(-10*delta.x(), -10*delta.y())
+    #         # pan the chart
+    #         #chart_point = self.chart().mapToValue(event.position())
+    #         # pan the chart by the difference between the last mouse position and the current mouse position
+    #         #delta = chart_point - self.last_mouse_pos
+    #         #self.chart().scroll(-10*delta.x(), -10*delta.y())
+        return super().mouseMoveEvent(event)
 
 
 if __name__ == '__main__':

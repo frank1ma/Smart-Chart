@@ -8,6 +8,8 @@ from PySide6.QtGui import QAction
 from plot_navigator.plot_navigator import PlotNavigator
 from smart_chart_view import SmartChartView
 
+#add plot_navigator/icon/plot_navigator_rc.py into python path
+
 # create smart chart class as QFrame
 class SmartChart(QFrame):
     # constructor
