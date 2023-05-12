@@ -1,5 +1,7 @@
-from PySide6.QtWidgets import QFrame,QMenu,QGraphicsView,QFileDialog
+import pandas as pd
+from PySide6.QtWidgets import QFrame,QMenu,QGraphicsView,QFileDialog,QInputDialog,QDialog
 from .ui_plot_navigator import Ui_plot_navigator
+from .series_editor import SeriesEditor
 from PySide6.QtCharts import QChartView,QLineSeries
 from PySide6.QtCore import Qt,QTimer, QPointF, QSize, QRectF
 from PySide6.QtGui import QAction,QPixmap, QPainter, QPdfWriter,QPageSize
@@ -29,6 +31,12 @@ class PlotNavigator(QFrame):
         #click the home_button to reset the chart
         self.ui.origin_view_button.clicked.connect(self.resetChart)
 
+        #click the setting button to set the chart title
+        self.ui.series_editor_button.clicked.connect(self.showSeriesEditor)
+
+        #click the setting_button to set the chart title
+        self.ui.setting_button.clicked.connect(self.removeSeries)
+
         #click the zoom_in_button to zoom in the chart
         self.ui.zoom_button.setCheckable(True)
         self.ui.zoom_button.clicked.connect(self.enableZoomInChart)
@@ -39,18 +47,18 @@ class PlotNavigator(QFrame):
     def _initPopMenu(self):
         self._initVerticalMarkerButtonPopMenu()
         self._initOriginViewButtonPopMenu()
+        self._initMeasureButtonPopMenu()
 
     # init popmenu of the vertical marker button
     def _initVerticalMarkerButtonPopMenu(self):
         # create a pop menu
         self.vertical_marker_pop_menu = QMenu(self)
+        self.vertical_marker_pop_menu.setStyleSheet("QMenu::item:disabled {color: gray;}")
         # add actions to the pop menu
         add_action = QAction("Add Vertical New Line Marker",self)
-        delete_action = QAction("Delete Vertical Line Marker",self)
         limit_range_action = QAction("Set Range to Series",self)
         # create a action for the pop menu
         self.vertical_marker_pop_menu.addAction(add_action)
-        self.vertical_marker_pop_menu.addAction(delete_action)
         self.vertical_marker_pop_menu.addAction(limit_range_action)
         # set the pop menu to the vertical marker button
         self.ui.vertical_marker_button.setMenu(self.vertical_marker_pop_menu)
@@ -59,8 +67,25 @@ class PlotNavigator(QFrame):
         limit_range_action.setCheckable(True)
         # connect the action to the slot
         add_action.triggered.connect(self.addVerticalLineMarker)
-        #delete_action.triggered.connect(self.deleteVerticalMarker)
         limit_range_action.triggered.connect(self._limitRangeToSeries)
+
+        # grey out limit range action
+        limit_range_action.setEnabled(False)
+ 
+    # init popmenu of the measure button
+    def _initMeasureButtonPopMenu(self):
+        # create a pop menu
+        self.measure_pop_menu = QMenu(self)
+
+        # add actions to the pop menu
+        add_p2p_action = QAction("Add Point-to-Point", self)
+        # create a action for the pop menu
+        self.measure_pop_menu.addAction(add_p2p_action)
+        # set the pop menu to the measure button
+        self.ui.measure_button.setMenu(self.measure_pop_menu)
+
+        # connect the action to the slot
+        add_p2p_action.triggered.connect(self.addP2PMeasure)
 
     #init popmenu of the original view button
     def _initOriginViewButtonPopMenu(self):
@@ -84,11 +109,12 @@ class PlotNavigator(QFrame):
         if self.ui.vertical_marker_button.isChecked():
             if len(self.main_chart_view.vertical_marker_dict)==0:
                 new_vlm = self.addVerticalLineMarker()
-            for vlm in self.main_chart_view.vertical_marker_dict.values():
-                vlm.setVisible(True)
-                vlm.vlm_circle.setVisible(True)
-                self._setVerticalLineMarkerLastXPos(vlm)
-                self.main_chart_view.update_vertical_line(vlm,vlm.last_vertical_line_x_pos)
+                if new_vlm is None:
+                    self.ui.vertical_marker_button.setChecked(False)
+                    return
+            self.main_chart_view.updateAllVLM()
+            # enable the actions
+            self.vertical_marker_pop_menu.actions()[2].setEnabled(True) # limit range action
         else:
             if len(self.main_chart_view.vertical_marker_dict)==0:
                 return
@@ -97,7 +123,22 @@ class PlotNavigator(QFrame):
                     vlm.setVisible(False)
                     vlm.vlm_circle.setVisible(False)
                     vlm.text_item.setPlainText("")
+            # disable the actions
+            self.vertical_marker_pop_menu.actions()[2].setEnabled(False) # limit range action
+    
+    def addP2PMeasure(self):
+        if not self.ui.measure_button.isChecked():
+            self.ui.measure_button.setChecked(True)
+        self.main_chart_view.addP2PMeasure()
 
+    #show the series editor to allow user to choose which series to show by using checkboxes
+    def showSeriesEditor(self):
+        # create a series editor as SeriesEditor which includes checkboxes for each series
+        self.series_editor = SeriesEditor(self,data_label="Plant")
+        # if return is ok, then update the visbiility of the series using self.main_chart_view.updateSeriesVisibility()
+        if self.series_editor.exec() == QDialog.Accepted:
+            self.main_chart_view.updateSeriesVisibility(self.series_editor.get_series_to_show())
+    
     # reset the chart
     def resetChart(self):
         # reset the plot area
@@ -135,6 +176,27 @@ class PlotNavigator(QFrame):
                 self._showLabelMsg("Save Chart Error", 3000)
             else:
                 self._showLabelMsg("Chart Saved", 3000)
+    
+    def saveSeriesToCSV(self, id_list: list):
+        if len(id_list) == 0:
+            self._showLabelMsg("No Series Selected", 3000)
+            return
+        # set the default file name in Qfiledialog
+        file_dialog = QFileDialog(self)
+        file_dialog.setDefaultSuffix("csv")
+        # set the default file name to the main_chart_view.chart_title
+        default_name = (self.main_chart_view.chart().title())
+        default_directory = "./" 
+        # get the file path
+        file_path, _ = file_dialog.getSaveFileName(self, "Save the chart to", default_directory+default_name, 
+            "CSV files (*.csv)")
+        if file_path:
+            try:
+                self._saveSeriesToCSV(id_list, file_path)
+            except:
+                self._showLabelMsg("Save Series Error", 3000)
+            else:
+                self._showLabelMsg("Series Saved", 3000)
 
     # pan the chart
     def enablePanChart(self):
@@ -145,6 +207,7 @@ class PlotNavigator(QFrame):
                 self.ui.zoom_button.setChecked(False)
         else:
             self.main_chart_view.setDragMode(QGraphicsView.DragMode.NoDrag)
+
     # set rubberband to zoom in the chart
     def enableZoomInChart(self):
         if self.ui.zoom_button.isChecked():
@@ -175,9 +238,45 @@ class PlotNavigator(QFrame):
 
     # add a vertical line marker to the chart
     def addVerticalLineMarker(self):
-        vertical_line_marker = self.main_chart_view.addVerticalLineMarker(self.main_chart_view.chart().axisX().min()*1.1)
-        #selfMarker.(vertical_line_marker)
-        return vertical_line_marker
+        # if no series in the chart, return None
+        if len(self.main_chart_view.series_dict)==0:
+            self._showLabelMsg("No Series in the Chart. Please Series first.", 3000)
+            return None
+        # pop up a dialog to ask for which series to add the vertical line marker, add color of series to each item
+        series_name, ok = QInputDialog.getItem(self, "Select Series", "Series:", 
+                                               [f"{series.label} ({str(series.id)})" for 
+                                                series in self.main_chart_view.series_dict.values()], 0, False)
+        if ok:
+            # extract series.id from series_name
+            series_id = int(series_name.split("(")[-1].split(")")[0])
+            # get the series from series_id
+            series = self.main_chart_view.series_dict[series_id]
+            vertical_line_marker = self.main_chart_view.addVerticalLineMarker(series,self.main_chart_view.chart().axisX().min()*1.2)
+            vertical_line_marker.updateVLM(vertical_line_marker.last_vertical_line_x_pos)
+            # if vertical_marker_button is not checked, check it
+            if not self.ui.vertical_marker_button.isChecked():
+                self.ui.vertical_marker_button.setChecked(True)
+            return vertical_line_marker
+        else:
+            return None
+        
+    # remove a series from the chart
+    def removeSeries(self):
+        # pop up a dialog to ask for which series to remove, add color of series to each item
+        series_name, ok = QInputDialog.getItem(self, "Select Series", "Series:", 
+                                               [f"{series.label} ({str(series.id)})" for 
+                                                series in self.main_chart_view.series_dict.values()], 0, False)
+        if ok:
+            # extract series.id from series_name
+            series_id = int(series_name.split("(")[-1].split(")")[0])
+            # get the series from series_id
+            series = self.main_chart_view.series_dict[series_id]
+            # remove the series from the chart
+            self.main_chart_view.removeSeries(series)
+            # update the msg_label "Series Removed" and clear it after 3 seconds
+            self._showLabelMsg("Series Removed")
+        else:
+            pass
 
     def _limitRangeToSeries(self):
         # limit the range of the vertical line marker to the range of series
@@ -187,7 +286,8 @@ class PlotNavigator(QFrame):
         # set all vlm in self.main_chart_view.vertical_line_series to the last x pos of the vertical line marker
         for vlm in self.main_chart_view.vertical_marker_dict.values():
             self._setVerticalLineMarkerLastXPos(vlm)
-            self.main_chart_view.update_vertical_line(vlm,vlm.last_vertical_line_x_pos)
+            #self.main_chart_view.update_vertical_line(vlm,vlm.last_vertical_line_x_pos)
+            self.main_chart_view.updateALLVLM()
 
     def _setVerticalLineMarkerLastXPos(self,vertical_line_marker:QLineSeries):
         # if (vertical_line_marker.last_vertical_line_x_pos < self.main_chart_view.chart().axisX().min()
@@ -225,6 +325,30 @@ class PlotNavigator(QFrame):
             painter.end()
         else:
             raise ValueError("Unsupported file format")
+        
+    # save the series with given id to csv file using pandas
+    def _saveSeriesToCSV(self, id_list, file_path):
+        # if id_list is empty, return None
+        if len(id_list) == 0:
+            return None
+        # create an empty dataframe
+        df = pd.DataFrame()
+        # for each id in id_list, get the series from self.main_chart_view.series_dict
+        for id in id_list:
+            series = self.main_chart_view.series_dict[id]       
+            points = series.pointsVector()
+            # get the x and y data from pointsvector
+            x_data = [point.x() for point in points]
+            y_data = [point.y() for point in points]
+            # create a dataframe with the x and y data
+            df_temp = pd.DataFrame({f"{series.label} index":range(1,len(x_data)+1),"x":x_data,"y":y_data})
+            # concat the dataframe to df
+            df = pd.concat([df,df_temp],axis=1)
+
+        # save the dataframe to csv file
+        df.to_csv(file_path)
+        # update the msg_label "Series Saved" and clear it after 3 seconds
+        self._showLabelMsg("Series Saved")
 
 
         

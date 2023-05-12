@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'plot_navigatorCUhVnf.ui'
+## Form generated from reading UI file 'plot_navigatorhXngsw.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.5.0
 ##
@@ -16,7 +16,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
-    QPushButton, QSizePolicy, QWidget)
+    QPushButton, QSizePolicy, QToolButton, QWidget)
 
 from .custom_tool_button import CustomToolButton
 import plot_navigator_rc
@@ -25,7 +25,7 @@ class Ui_plot_navigator(object):
     def setupUi(self, plot_navigator):
         if not plot_navigator.objectName():
             plot_navigator.setObjectName(u"plot_navigator")
-        plot_navigator.resize(400, 50)
+        plot_navigator.resize(416, 50)
         plot_navigator.setMinimumSize(QSize(400, 50))
         plot_navigator.setMaximumSize(QSize(800, 50))
         self.horizontalLayout = QHBoxLayout(plot_navigator)
@@ -50,15 +50,15 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.vertical_marker_button)
 
-        self.after_view_button = QPushButton(plot_navigator)
-        self.after_view_button.setObjectName(u"after_view_button")
-        self.after_view_button.setMaximumSize(QSize(36, 16777215))
+        self.measure_button = CustomToolButton(plot_navigator)
+        self.measure_button.setObjectName(u"measure_button")
+        self.measure_button.setMaximumSize(QSize(36, 16777215))
         icon2 = QIcon()
         icon2.addFile(u":/navigator/ruler-60.png", QSize(), QIcon.Normal, QIcon.Off)
-        self.after_view_button.setIcon(icon2)
-        self.after_view_button.setIconSize(QSize(24, 24))
+        self.measure_button.setIcon(icon2)
+        self.measure_button.setIconSize(QSize(24, 24))
 
-        self.horizontalLayout.addWidget(self.after_view_button)
+        self.horizontalLayout.addWidget(self.measure_button)
 
         self.pan_view_button = QPushButton(plot_navigator)
         self.pan_view_button.setObjectName(u"pan_view_button")
@@ -80,22 +80,32 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.zoom_button)
 
-        self.setting__button = QPushButton(plot_navigator)
-        self.setting__button.setObjectName(u"setting__button")
-        self.setting__button.setMaximumSize(QSize(36, 16777215))
+        self.series_editor_button = QToolButton(plot_navigator)
+        self.series_editor_button.setObjectName(u"series_editor_button")
+        self.series_editor_button.setMaximumSize(QSize(36, 16777215))
         icon5 = QIcon()
-        icon5.addFile(u":/navigator/adjust-60.png", QSize(), QIcon.Normal, QIcon.Off)
-        self.setting__button.setIcon(icon5)
-        self.setting__button.setIconSize(QSize(24, 24))
+        icon5.addFile(u":/navigator/edit-60.png", QSize(), QIcon.Normal, QIcon.Off)
+        self.series_editor_button.setIcon(icon5)
+        self.series_editor_button.setIconSize(QSize(24, 24))
 
-        self.horizontalLayout.addWidget(self.setting__button)
+        self.horizontalLayout.addWidget(self.series_editor_button)
+
+        self.setting_button = QPushButton(plot_navigator)
+        self.setting_button.setObjectName(u"setting_button")
+        self.setting_button.setMaximumSize(QSize(36, 16777215))
+        icon6 = QIcon()
+        icon6.addFile(u":/navigator/adjust-60.png", QSize(), QIcon.Normal, QIcon.Off)
+        self.setting_button.setIcon(icon6)
+        self.setting_button.setIconSize(QSize(24, 24))
+
+        self.horizontalLayout.addWidget(self.setting_button)
 
         self.save_button = QPushButton(plot_navigator)
         self.save_button.setObjectName(u"save_button")
         self.save_button.setMaximumSize(QSize(36, 16777215))
-        icon6 = QIcon()
-        icon6.addFile(u":/navigator/save-60.png", QSize(), QIcon.Normal, QIcon.Off)
-        self.save_button.setIcon(icon6)
+        icon7 = QIcon()
+        icon7.addFile(u":/navigator/save-60.png", QSize(), QIcon.Normal, QIcon.Off)
+        self.save_button.setIcon(icon7)
         self.save_button.setIconSize(QSize(24, 24))
 
         self.horizontalLayout.addWidget(self.save_button)
@@ -120,6 +130,8 @@ class Ui_plot_navigator(object):
         plot_navigator.setWindowTitle(QCoreApplication.translate("plot_navigator", u"Frame", None))
         self.origin_view_button.setText(QCoreApplication.translate("plot_navigator", u"...", None))
         self.vertical_marker_button.setText(QCoreApplication.translate("plot_navigator", u"...", None))
+        self.measure_button.setText(QCoreApplication.translate("plot_navigator", u"...", None))
+        self.series_editor_button.setText(QCoreApplication.translate("plot_navigator", u"...", None))
         self.position_label.setText("")
         self.msg_label.setText("")
     # retranslateUi
