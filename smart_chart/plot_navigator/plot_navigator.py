@@ -4,7 +4,7 @@ from .ui_plot_navigator import Ui_plot_navigator
 from .series_editor import SeriesEditor
 from PySide6.QtCharts import QChartView,QLineSeries
 from PySide6.QtCore import Qt,QTimer, QPointF, QSize, QRectF
-from PySide6.QtGui import QAction,QPixmap, QPainter, QPdfWriter,QPageSize
+from PySide6.QtGui import QAction,QPixmap, QPainter, QPdfWriter,QPageSize,QShortcut,QKeySequence
 from PySide6.QtSvg import QSvgGenerator
 
 # create a class for the plot navigator as QFrame  
@@ -37,6 +37,10 @@ class PlotNavigator(QFrame):
         #click the setting_button to set the chart title
         self.ui.setting_button.clicked.connect(self.removeSeries)
 
+        #click the measure_button to measure the distance between two points
+        self.ui.measure_button.setCheckable(True)
+        self.ui.measure_button.clicked.connect(self.enableMeasure)
+
         #click the zoom_in_button to zoom in the chart
         self.ui.zoom_button.setCheckable(True)
         self.ui.zoom_button.clicked.connect(self.enableZoomInChart)
@@ -57,9 +61,14 @@ class PlotNavigator(QFrame):
         # add actions to the pop menu
         add_action = QAction("Add Vertical New Line Marker",self)
         limit_range_action = QAction("Set Range to Series",self)
+        add_auxiliary_v_action = QAction("Add Vertical Auxiliary Line Marker",self)
+        add_auxiliary_h_action = QAction("Add Horizontal Auxiliary Line Marker",self)
         # create a action for the pop menu
         self.vertical_marker_pop_menu.addAction(add_action)
         self.vertical_marker_pop_menu.addAction(limit_range_action)
+        self.vertical_marker_pop_menu.addSeparator()
+        self.vertical_marker_pop_menu.addAction(add_auxiliary_v_action)
+        self.vertical_marker_pop_menu.addAction(add_auxiliary_h_action)
         # set the pop menu to the vertical marker button
         self.ui.vertical_marker_button.setMenu(self.vertical_marker_pop_menu)
 
@@ -68,6 +77,8 @@ class PlotNavigator(QFrame):
         # connect the action to the slot
         add_action.triggered.connect(self.addVerticalLineMarker)
         limit_range_action.triggered.connect(self._limitRangeToSeries)
+        add_auxiliary_v_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("vertical"))
+        add_auxiliary_h_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("horizontal"))
 
         # grey out limit range action
         limit_range_action.setEnabled(False)
@@ -78,14 +89,21 @@ class PlotNavigator(QFrame):
         self.measure_pop_menu = QMenu(self)
 
         # add actions to the pop menu
+        add_vm_action = QAction("Add Vertical Measure",self)
+        add_hm_action = QAction("Add Horizontal Measure",self)
         add_p2p_action = QAction("Add Point-to-Point", self)
+
         # create a action for the pop menu
+        self.measure_pop_menu.addAction(add_vm_action)
+        self.measure_pop_menu.addAction(add_hm_action)
         self.measure_pop_menu.addAction(add_p2p_action)
         # set the pop menu to the measure button
         self.ui.measure_button.setMenu(self.measure_pop_menu)
 
         # connect the action to the slot
-        add_p2p_action.triggered.connect(self.addP2PMeasure)
+        add_vm_action.triggered.connect(lambda: self.selectMeasure("vertical"))
+        add_hm_action.triggered.connect(lambda: self.selectMeasure("horizontal"))
+        add_p2p_action.triggered.connect(lambda: self.selectMeasure("p2p"))
 
     #init popmenu of the original view button
     def _initOriginViewButtonPopMenu(self):
@@ -114,7 +132,7 @@ class PlotNavigator(QFrame):
                     return
             self.main_chart_view.updateAllVLM()
             # enable the actions
-            self.vertical_marker_pop_menu.actions()[2].setEnabled(True) # limit range action
+            self.vertical_marker_pop_menu.actions()[1].setEnabled(True) # limit range action
         else:
             if len(self.main_chart_view.vertical_marker_dict)==0:
                 return
@@ -124,12 +142,7 @@ class PlotNavigator(QFrame):
                     vlm.vlm_circle.setVisible(False)
                     vlm.text_item.setPlainText("")
             # disable the actions
-            self.vertical_marker_pop_menu.actions()[2].setEnabled(False) # limit range action
-    
-    def addP2PMeasure(self):
-        if not self.ui.measure_button.isChecked():
-            self.ui.measure_button.setChecked(True)
-        self.main_chart_view.addP2PMeasure()
+            self.vertical_marker_pop_menu.actions()[1].setEnabled(False) # limit range action
 
     #show the series editor to allow user to choose which series to show by using checkboxes
     def showSeriesEditor(self):
@@ -208,6 +221,25 @@ class PlotNavigator(QFrame):
         else:
             self.main_chart_view.setDragMode(QGraphicsView.DragMode.NoDrag)
 
+    # enable the measure mode
+    def enableMeasure(self):
+        if self.ui.measure_button.isChecked():
+            self.main_chart_view.setRubberBand(QChartView.NoRubberBand)
+            self.main_chart_view.setDragMode(QGraphicsView.DragMode.NoDrag)
+            if self.ui.zoom_button.isChecked():
+                self.ui.zoom_button.setChecked(False)
+            elif self.ui.pan_view_button.isChecked():
+                self.ui.pan_view_button.setChecked(False)
+        else:
+            self.main_chart_view.setDragMode(QGraphicsView.DragMode.NoDrag)
+            if self.main_chart_view.point_marker!=None:
+                self.main_chart_view.point_marker.setVisible(False)
+    
+    def selectMeasure(self,type:str):
+        self.main_chart_view.current_measure_type = type
+        self.ui.measure_button.setChecked(True)
+        self.enableMeasure()
+
     # set rubberband to zoom in the chart
     def enableZoomInChart(self):
         if self.ui.zoom_button.isChecked():
@@ -260,6 +292,20 @@ class PlotNavigator(QFrame):
         else:
             return None
         
+    def addAuxiliaryLineMarker(self,line_type:str):
+        # pop up a dialog to input the position of the auxiliary line marker according to line_type
+        # if it's a horizontal line, ask for y position, if it's a vertical line, ask for x position
+        if line_type=="horizontal":
+            pos, ok = QInputDialog.getDouble(self, "Input Position", "Y Position:",
+                                              self.main_chart_view.chart().axisY().min()*1.5)
+            if ok:
+                self.main_chart_view.addAuxiliaryLineMarker(line_type,pos)
+        elif line_type=="vertical":
+            pos, ok = QInputDialog.getDouble(self, "Input Position", "X Position:",
+                                              self.main_chart_view.chart().axisX().min()*1.5)
+            if ok:
+                self.main_chart_view.addAuxiliaryLineMarker(line_type,pos)
+        
     # remove a series from the chart
     def removeSeries(self):
         # pop up a dialog to ask for which series to remove, add color of series to each item
@@ -287,7 +333,7 @@ class PlotNavigator(QFrame):
         for vlm in self.main_chart_view.vertical_marker_dict.values():
             self._setVerticalLineMarkerLastXPos(vlm)
             #self.main_chart_view.update_vertical_line(vlm,vlm.last_vertical_line_x_pos)
-            self.main_chart_view.updateALLVLM()
+            self.main_chart_view.updateAllVLM()
 
     def _setVerticalLineMarkerLastXPos(self,vertical_line_marker:QLineSeries):
         # if (vertical_line_marker.last_vertical_line_x_pos < self.main_chart_view.chart().axisX().min()
