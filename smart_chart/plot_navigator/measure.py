@@ -136,12 +136,16 @@ class MeasureMarker(QLineSeries):
 
             if self.measure.left_point.y() > self.measure.right_point.y():  
             # add horizontal aux line marker
-                self.halm1 = HorizontalAuxLineMarker(self.chart_view, self.measure.left_point.y(),self.measure_line.p1().x()*0.8,self.measure.right_point.x())
-                self.halm2 = HorizontalAuxLineMarker(self.chart_view, self.measure.right_point.y(),self.measure_line.p2().x()*0.8,self.measure.right_point.x())
+                self.halm1 = HorizontalAuxLineMarker(self.chart_view, self.measure.left_point.y(),self.measure_line.p1().x()*0.8
+                                                     ,self.measure.right_point.x(),mode="measure")
+                self.halm2 = HorizontalAuxLineMarker(self.chart_view, self.measure.right_point.y(),self.measure_line.p2().x()*0.8
+                                                     ,self.measure.right_point.x(),mode="measure")
             else:
                          # add horizontal aux line marker
-                self.halm1 = HorizontalAuxLineMarker(self.chart_view, self.measure.left_point.y(),self.measure_line.p1().x()*1.2,self.measure.left_point.x())
-                self.halm2 = HorizontalAuxLineMarker(self.chart_view, self.measure.right_point.y(),self.measure_line.p2().x()*1.2,self.measure.left_point.x())
+                self.halm1 = HorizontalAuxLineMarker(self.chart_view, self.measure.left_point.y(),self.measure_line.p1().x()*1.2
+                                                     ,self.measure.left_point.x(),mode="measure")
+                self.halm2 = HorizontalAuxLineMarker(self.chart_view, self.measure.right_point.y(),self.measure_line.p2().x()*1.2
+                                                     ,self.measure.left_point.x(),mode="measure")
             # add text item above the marker
             self.text_item = QGraphicsTextItem()
             # set the position of the text item to the middle of the measure line
@@ -165,8 +169,8 @@ class MeasureMarker(QLineSeries):
             self.append(self.measure_line.p1())
             self.append(self.measure_line.p2())
 
-            self.valm1 = VerticalAuxLineMarker(self.chart_view, self.measure.left_point.x(),self.measure_line.p1().y())
-            self.valm2 = VerticalAuxLineMarker(self.chart_view, self.measure.right_point.x(),self.measure_line.p1().y())
+            self.valm1 = VerticalAuxLineMarker(self.chart_view, self.measure.left_point.x(),self.measure_line.p1().y(),mode="measure")
+            self.valm2 = VerticalAuxLineMarker(self.chart_view, self.measure.right_point.x(),self.measure_line.p1().y(),mode="measure")
             
             # add text item above the marker
             self.text_item = QGraphicsTextItem()
@@ -216,8 +220,6 @@ class MeasureMarker(QLineSeries):
         for marker in aux_line_marker:
             if marker is not None:
                 marker.clearMarker()
-                marker.__class__.isinstance_count -= 1
-                marker.__class__.id_pool.remove(marker.id)
                 del marker
         self.valm1, self.valm2, self.halm1, self.halm2 = None,None,None,None
 
@@ -241,13 +243,15 @@ class MeasureMarker(QLineSeries):
 class HorizontalAuxLineMarker(QLineSeries):
     isinstance_count = 0
     id_pool = set()
-    def __init__(self, chart_view:QChartView, y_value:float, x1_value:float=None,x2_value:float=None):
+    def __init__(self, chart_view:QChartView, y_value:float, x1_value:float=None,x2_value:float=None, mode:str="normal"):
         super().__init__()
         self.chart_view = chart_view
         HorizontalAuxLineMarker.isinstance_count += 1
         self.y_value = y_value
         self.x1_value = x1_value
         self.x2_value = x2_value
+        self.aux_line_mode = mode
+        self.point_marker = {}
         self.setupID()
         self.setName(f"HorizontalAuxLineMarker_{self.id}")
         self.chart_view.aux_line_dict[self.id] = self
@@ -266,18 +270,42 @@ class HorizontalAuxLineMarker(QLineSeries):
             self.append(QPointF(self.chart_view.chart().axisX().max(), self.y_value))
         self.chart_view.addSeriestoXY(self, self.chart_view.x_axis, self.chart_view.y_axis)
         self.show()
+
     def setupID(self):
+        # Both VerticalAuxLineMarker and HorizontalAuxLineMarker share the same id_pool
         # assign an id and try from 1,2,3,4,5... until an id is not in the id_pool
         id = 1
         while True:
-            if id not in HorizontalAuxLineMarker.id_pool:
+            if id not in HorizontalAuxLineMarker.id_pool and id not in VerticalAuxLineMarker.id_pool:
                 HorizontalAuxLineMarker.id_pool.add(id)
                 break
             id = id + 1
         self.id = id
+    
+    def addPointMarker(self,point_marker:PointMarker):
+        self.point_marker[point_marker.id] = point_marker
+        return True
+
+    def _deletePointMarker(self,point_marker:PointMarker):
+        if point_marker.id in self.point_marker:
+            del self.point_marker[point_marker.id]
+            point_marker.clearMarker()
+            del point_marker
+            return True
+        else:
+            return False
+    
+    def deletePointMarkers(self):
+        while len(self.point_marker)>0:
+                self._deletePointMarker(self.point_marker.values().__iter__().__next__())
+        self.point_marker = {}
+        return True
         
     def clearMarker(self):
         self.chart_view.chart().removeSeries(self)
+        self.deletePointMarkers()
+        HorizontalAuxLineMarker.id_pool.remove(self.id)
+        HorizontalAuxLineMarker.isinstance_count -= 1
         return True
     
     def getInterpolatedALM(self, x_value:float):
@@ -287,17 +315,33 @@ class HorizontalAuxLineMarker(QLineSeries):
             return None
         else:
             return self.interpolated(x_value)
+        
+    def setPosition(self,y_value:float):
+        # set the position of the ALM to the current y_value
+        # if the y_value is out of range, hide the ALM
+        self.clear()
+        self.append(QPointF(self.chart_view.chart().axisX().min(), y_value))
+        self.append(QPointF(self.chart_view.chart().axisX().max(), y_value))
+        self.y_value = y_value
+
+    def redraw(self):
+        # redraw the ALM
+        self.clear()
+        self.append(QPointF(self.chart_view.chart().axisX().min(), self.y_value))
+        self.append(QPointF(self.chart_view.chart().axisX().max(), self.y_value))
 
 # vertical auxiliary line marker class
 class VerticalAuxLineMarker(QLineSeries):
     isinstance_count = 0
     id_pool = set()
-    def __init__(self, chart_view:QChartView, x_value:float, y_value:float=None):
+    def __init__(self, chart_view:QChartView, x_value:float, y_value:float=None,mode:str="normal"):
         super().__init__()
         self.chart_view = chart_view
         VerticalAuxLineMarker.isinstance_count += 1
         self.x_value = x_value
         self.y_value = y_value
+        self.aux_line_mode = mode
+        self.point_marker = {}
         self.setupID()
         self.setName(f"VerticalAuxLineMarker_{self.id}")
         pen = QPen()
@@ -317,18 +361,57 @@ class VerticalAuxLineMarker(QLineSeries):
         self.show()
         
     def setupID(self):
+        # Both VerticalAuxLineMarker and HorizontalAuxLineMarker share the same id_pool
         # assign an id and try from 1,2,3,4,5... until an id is not in the id_pool
         id = 1
         while True:
-            if id not in VerticalAuxLineMarker.id_pool:
+            if id not in VerticalAuxLineMarker.id_pool and id not in HorizontalAuxLineMarker.id_pool:
                 VerticalAuxLineMarker.id_pool.add(id)
                 break
             id = id + 1
         self.id = id
+
+    def addPointMarker(self,point_marker:PointMarker):
+        self.point_marker[point_marker.id] = point_marker
+        return True
+
+    def _deletePointMarker(self,point_marker:PointMarker):
+        if point_marker.id in self.point_marker:
+            del self.point_marker[point_marker.id]
+            point_marker.clearMarker()
+            del point_marker
+            return True
+        else:
+            return False
+    
+    def deletePointMarkers(self):
+        while len(self.point_marker)>0:
+                self._deletePointMarker(self.point_marker.values().__iter__().__next__())
+        self.point_marker = {}
+        return True
     
     def clearMarker(self):
         self.chart_view.chart().removeSeries(self)
+        self.deletePointMarkers()
+        VerticalAuxLineMarker.id_pool.remove(self.id)
+        VerticalAuxLineMarker.isinstance_count -= 1
+
         return True
+    
+    def setPosition(self,x_value:float=None):
+        # set the position of the ALM to the current y_value
+        # if the y_value is out of range, hide the ALM
+        self.clear()
+        self.append(QPointF(x_value, self.chart_view.x_axis.min()))
+        self.append(QPointF(x_value, self.chart_view.y_axis.max()))
+        self.x_value = x_value
+
+
+    def redraw(self):
+        # redraw the ALM
+        self.clear()
+        self.append(QPointF(self.x_value, self.chart_view.x_axis.min()))
+        self.append(QPointF(self.x_value, self.chart_view.y_axis.max()))
     
 
 class PointMarker(QScatterSeries):

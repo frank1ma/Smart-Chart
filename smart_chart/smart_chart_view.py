@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import Any
+from typing import Any,Optional,Union
 from plot_navigator.plot_navigator import PlotNavigator
 from plot_navigator.measure import Measure,MeasureMarker,PointMarker,VerticalAuxLineMarker,HorizontalAuxLineMarker
 from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries,QScatterSeries
 from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor
 from PySide6.QtCore import Qt,QEvent,QPointF
-from PySide6.QtWidgets import QGraphicsEllipseItem,QGraphicsTextItem,QApplication,QMenu,QColorDialog
+from PySide6.QtWidgets import QGraphicsEllipseItem,QGraphicsTextItem,QApplication,QMenu,QColorDialog,QInputDialog
 import math
+import sys
 class SmartChartView(QChartView):
 
     def __init__(self, chart: QChart,parent=None):
@@ -17,7 +18,7 @@ class SmartChartView(QChartView):
         self.initGraphicsGroup()
         self.initChart()
         self.updateDefaultRange()
-        self.plotXY([1,2,3],[3,4,5])
+        #self.plotXY([1,2,3],[3,4,5])
         for marker in self.chart().legend().markers():
             if marker.label()=="":
                 marker.setVisible(False)
@@ -41,15 +42,21 @@ class SmartChartView(QChartView):
         default_series = SmartLineSeries(self,"Default Series")
         self.series_dict[default_series.id] = default_series
 
-        # add some data to default series
-        default_series.append(1, 5)
-        default_series.append(2, 7)
-        default_series.append(3, 6)
-        default_series.append(4, 4)
-        default_series.append(5, 3)
-        default_series.append(6, 4)
-        default_series.append(7, 5)
-        
+        # add 5000 random points to default series
+        for i in range(500):
+            default_series.addData(i,math.sin(i/10))
+
+        # add some sample data to default series
+        # default_series.append(1,5)
+        # default_series.append(2,7)
+        # default_series.append(3,9)
+        # default_series.append(4,1)
+        # default_series.append(5,3)
+        # default_series.append(6,5)
+        # default_series.append(7,7)
+        # default_series.append(8,9)
+        # default_series.append(9,1)
+
         # set legend
         self.chart().legend().setVisible(True)
         self.chart().legend().setAlignment(Qt.AlignBottom)
@@ -62,9 +69,9 @@ class SmartChartView(QChartView):
         self.y_axis = QValueAxis()
         self.addSeriestoXY(default_series, self.x_axis, self.y_axis,True)
 
-        # set limit of axes
-        self.x_axis.setRange(0, 10)
-        self.y_axis.setRange(0, 10)
+        # set a proper range for x and y axes according to the data added
+        self.x_axis.setRange(self.x_axis.min(), self.x_axis.max())
+        self.y_axis.setRange(self.y_axis.min(), self.y_axis.max())
 
         # set legend text
         default_series.setName(default_series.label)
@@ -72,6 +79,8 @@ class SmartChartView(QChartView):
 
     # init options of charts
     def initOptions(self):
+        self.prev_scroll_x = 0
+        self.prev_scroll_y = 0
         self.markerLimitRangeToSeries = False
         self.vlm_selected = None
         self.point_marker = None 
@@ -80,6 +89,8 @@ class SmartChartView(QChartView):
         self.is_point_near_threshold_x = 0.1
         self.is_point_near_threshold_y = 0.1
         self.interpolated_series_step = 0.01
+        self.pan_x_sensitivity = 1
+        self.pan_y_sensitivity = 5
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -99,7 +110,7 @@ class SmartChartView(QChartView):
         if series == None:
             series = self.addNewSeries()
         self.updateSeries(series,x,y)
-        series.updateProperty() # add interpolated version of series
+        series.updateProperty() # add interpolated version of series if necessary
 
     def addNewSeries(self):
         # create a new series
@@ -164,6 +175,14 @@ class SmartChartView(QChartView):
                 self.series_dict[id].setVisible(False)
         self.chart().update()
 
+    # update the graphics of auxiliary lines
+    def updateAuxLineMarker(self):
+        if self.aux_line_dict != {}:
+            for alm in self.aux_line_dict.values():
+                if alm.aux_line_mode == "normal":
+                    alm.redraw()
+        self.chart().update()
+
     # setup navigator
     def setupNavigator(self, navigator: PlotNavigator):
         self.navigator = navigator
@@ -178,6 +197,7 @@ class SmartChartView(QChartView):
             self.updateAllVLM()
         if self.navigator.ui.measure_button.isChecked():
             self.updateMarkerText()
+        self.updateAuxLineMarker()
         QApplication.processEvents()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -225,12 +245,15 @@ class SmartChartView(QChartView):
                 self.current_measure_type = "horizontal"
                 self.point_selected = None
 
-        elif event.button() == Qt.RightButton:
+        if event.button() == Qt.RightButton:
             # find nearst auxilary line
             chart_point = self.chart().mapToValue(event.position())
             chosen_aux_line = self.findNearestAuxiliaryLine(chart_point)
             if chosen_aux_line!=None:
                 self.createAuxLineMenu(chosen_aux_line)
+            else:
+                print("blank area")
+        
 
         super().mousePressEvent(event)
         QApplication.processEvents()
@@ -356,20 +379,24 @@ class SmartChartView(QChartView):
         menu.popup(QCursor.pos())
 
     # create auxiliary vertical line marker
-    def createAuxLineMenu(self, aux_line:Any[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
+    def createAuxLineMenu(self, alm:Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
         # create a menu
         menu = QMenu(self)
+        # create a show point position action
+        show_point_position_action = QAction("Show Intersection Point", self)
+        show_point_position_action.triggered.connect(lambda: self.showIntersectionPoint(alm))
         # create a change position action
         change_position_action = QAction("Change Position", self)
-        #change_position_action.triggered.connect(lambda: self.changeAuxLinePosition())
+        change_position_action.triggered.connect(lambda: self.changeAuxLinePosition(alm))
         # create a change color action
         change_color_action = QAction("Change Color", self)
-        #change_color_action.triggered.connect(lambda: self.changeAuxLineColor())
+        change_color_action.triggered.connect(lambda: self.changeAuxLineColor(alm))
         # create a delete action
         delete_action = QAction("Delete", self)
-        #delete_action.triggered.connect(lambda: self.deleteAuxLine())
+        delete_action.triggered.connect(lambda: self.deleteAuxiliaryLineMarker(alm))
 
         # add actions to menu
+        menu.addAction(show_point_position_action)
         menu.addAction(change_position_action)
         menu.addAction(delete_action)
         menu.addAction(change_color_action)
@@ -407,15 +434,15 @@ class SmartChartView(QChartView):
         min_dis = 100
         nearst_al = None
         for al in self.aux_line_dict.values():
-            if al.__class__.__name__ == "HorizontalAuxLineMarker":
+            if al.__class__.__name__ == "HorizontalAuxLineMarker" and al.aux_line_mode!="measure":
                 al_min_dis = abs(al.points()[0].y() - point.y())
-            else:
+            elif al.__class__.__name__ == "VerticalAuxLineMarker" and al.aux_line_mode!="measure":
                 al_min_dis = abs(al.points()[0].x() - point.x())
 
             if min_dis > al_min_dis:
                 min_dis = al_min_dis
                 nearst_al = al
-        if nearst_al !=None and min_dis < 0.05:
+        if nearst_al !=None and min_dis < 1:  # self.auxiliaryLinethreshold:
             return nearst_al
         else:
             return None
@@ -430,10 +457,11 @@ class SmartChartView(QChartView):
         zoom_level_x = self.x_axis.max() / self.default_x_range[1]
         zoom_level_y = self.y_axis.max() / self.default_y_range[1]
         # pan the chart
-        self.chart().scroll(-10/zoom_level_x*delta.x(), -20/zoom_level_y*delta.y())
-
+        self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x)*delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
+ 
         self.updateMarkerText()
-        
+        self.updateAuxLineMarker()
+
     def updateMarkerText(self):
         # pan all the text item together with the chart
         for mm in self.measure_marker_dict.values():
@@ -448,7 +476,14 @@ class SmartChartView(QChartView):
             mm.point2_marker.point_coordinate_label.setPos(viewport_point2_pos)
         
 
-
+        # pan all the point coordinate label together with the auxiliary line marker
+        for alm in self.aux_line_dict.values():  
+            if alm.aux_line_mode == "measure": continue
+            for point_marker in alm.point_marker.values():
+                point_marker_viewport_text_pos = point_marker._convertPointFromChartViewtoViewPort(QPointF(point_marker.x_value,
+                                                                                point_marker.y_value))
+                point_marker.point_coordinate_label.setPos(point_marker_viewport_text_pos)
+        
     def addVerticalLineMarker(self, series:QLineSeries,x_pos: float):
         new_vlm = VerticalLineMarker(self,series,x_pos)
         return new_vlm
@@ -490,14 +525,38 @@ class SmartChartView(QChartView):
         # update the chart
         self.chart().update()
 
+    # delete the given auxiliary line marker
+    def deleteAuxiliaryLineMarker(self, alm: Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
+        # remove the given auxiliary line marker from the chart
+        alm.clearMarker()
+        # remove the given auxiliary line marker from the auxiliary_line_dict
+        del self.aux_line_dict[alm.id]
+
+        # delete the variable to prevent alm being used after it was removed from dict
+        del alm
+
+        # update the chart
+        self.chart().update()
+
+    def deleteAllAuxiliaryLineMarkers(self):
+        if len(self.aux_line_dict) == 0:
+            return
+        # size of dictionary will be change during iteration, so use while loop not for loop
+        while len(self.aux_line_dict) > 0:
+            self.deleteAuxiliaryLineMarker(self.aux_line_dict.values().__iter__().__next__())
+        self.aux_line_dict.clear()
+        self.chart().update()
+
     # change the color of the given measure marker
     def changeMeasureColor(self, mm: MeasureMarker):
         # open a color dialog
         color = QColorDialog.getColor()
         # if the user clicks OK, change the color of the given measure marker
         if color.isValid():
-            mm.setColor(color)
-
+            mm.setColor(color)  # set Measure Marker color
+            for aux_line in [mm.halm1,mm.halm2,mm.valm1,mm.valm2]:  # set Auxiliary Line Marker color
+                if aux_line != None:
+                    aux_line.setColor(color)
     # change the color of the given vertical line marker
     def changeVLMColor(self, vlm: VerticalLineMarker):
         # open a color dialog
@@ -505,6 +564,31 @@ class SmartChartView(QChartView):
         # if the user clicks OK, change the color of the given vertical line marker
         if color.isValid():
             vlm.setColor(color)
+
+    # change the color of the given auxiliary line marker
+    def changeAuxLineColor(self, alm: Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
+        # open a color dialog
+        color = QColorDialog.getColor()
+        # if the user clicks OK, change the color of the given auxiliary line marker
+        if color.isValid():
+            alm.setColor(color)
+
+    # change the position of the auxiliary line marker
+    def changeAuxLinePosition(self, alm:Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
+        # open a dialog to get the new position
+        if alm.__class__.__name__ == "HorizontalAuxLineMarker":
+            pos = alm.y_value
+        else:
+            pos = alm.x_value
+            
+        new_pos, ok = QInputDialog.getDouble(self, "Change Position", "New Position", pos,
+                                                -sys.float_info.max, sys.float_info.max, decimals=4)
+        # if the user clicks OK, change the position of the auxiliary line marker
+        if ok:
+            alm.setPosition(new_pos)
+            alm.deletePointMarkers()
+        
+
     # update the position of all vertical line marker in self.vertical_marker_dict
     def updateAllVLM(self):
         for vlm in self.vertical_marker_dict.values():
@@ -571,6 +655,52 @@ class SmartChartView(QChartView):
             self.scene().addItem(self.point_marker)
         return revealed_point  
     
+    def revealAuxLineIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker], series:SmartLineSeries):
+        # if alm pass through series, return the intersection point
+        intersection_point = []
+        if alm.__class__.__name__ == "HorizontalAuxLineMarker":
+           # verify if the alm.y_value is between the y value of the point before and after the point
+            for i in range(1,len(series.points())):
+                point1 = series.points()[i-1]
+                point2 = series.points()[i]
+                if point1.y()<=alm.y_value<=point2.y() or point1.y()>=alm.y_value>=point2.y():
+                    # calculate the intersection point
+                    x = point1.x()+(point2.x()-point1.x())*(alm.y_value-point1.y())/(point2.y()-point1.y())
+                    intersection_point.append(QPointF(x,alm.y_value))
+        elif alm.__class__.__name__ == "VerticalAuxLineMarker":
+            # verify if the alm.x_value is between the x value of the point before and after the point
+            for i in range(1,len(series.points())):
+                point1 = series.points()[i-1]
+                point2 = series.points()[i]
+                if point1.x()<=alm.x_value<=point2.x() or point1.x()>=alm.x_value>=point2.x():
+                    # calculate the intersection point
+                    y = point1.y()+(point2.y()-point1.y())*(alm.x_value-point1.x())/(point2.x()-point1.x())
+                    intersection_point.append(QPointF(alm.x_value,y))
+        return intersection_point
+
+    def showIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
+        # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return
+        # add a checkbox to ask user if he wants to show intersection point of all series
+        series_list = list(self.series_dict.values())
+        series_list = [series for series in series_list if series.isVisible()]
+        if len(series_list) == 0:
+            # show navigation's label message to tell user that there is no series to select
+            self.navigator.showLabelMsg("No series to select")
+            return
+        series_name_list = [series.name() for series in series_list]
+        series_name, ok = QInputDialog.getItem(self, "Select a series", "Series:", series_name_list, 0, False)
+        if not ok:
+            return
+        series = series_list[series_name_list.index(series_name)]
+        intersection_points = self.revealAuxLineIntersectionPoint(alm, series) #
+        if intersection_points!=[]:
+            # print("point marker is:",alm.point_marker)
+            alm.deletePointMarkers() # clear all previous point markers
+            for point in intersection_points:
+                alm.addPointMarker(PointMarker(self,point.x(),point.y()))
+        else:
+            self.navigator.showLabelMsg("No intersection point found")
+            
     def _is_point_near(self, point1, point2):
         threshold_x = self.is_point_near_threshold_x 
         threshold_y = self.is_point_near_threshold_y 
@@ -597,7 +727,9 @@ class SmartLineSeries(QLineSeries):
         self.instance_count+=1
         self.label = label
         self.setupID()
+        self.interval = 0
         self.interpolated_series = None
+        self.interpolated_flag = False
 
     def setupID(self):
         # assign an id and try from 1,2,3,4,5... until an id is not in the id_pool
@@ -609,15 +741,34 @@ class SmartLineSeries(QLineSeries):
             id = id + 1
         self.id = id
 
+    def addData(self,x:float,y:float):
+        self.append(x,y)
+        self.setName(f"My Series {self.label}")
+        if self.count()>1:
+            self.interval = self.at(self.count()-1).x()-self.at(self.count()-2).x()
+
     # update the series with x,y data given
     def updateSeries(self,x_data:list,y_data:list):
         self.clear()
         for i in range(len(x_data)):
             self.append(x_data[i],y_data[i])
         self.setName(f"My Series {self.label}")
+        if len(x_data)>0:
+            self.interval = x_data[1]-x_data[0]
 
     def updateProperty(self):
-        self._interpolateSeries(self.chart_view.interpolated_series_step)
+        if self.chart_view.interpolated_series_step <= 0:
+            self.interpolated_series = self
+            self.interpolated_flag = False
+        elif self.chart_view.interpolated_series_step >= self.interval:
+            self.interpolated_series = self
+            self.interpolated_flag = False
+        elif self.count() > 100:
+            self.interpolated_series = self
+            self.interpolated_flag = False
+        else:
+            self._interpolateSeries(self.chart_view.interpolated_series_step)
+            self.interpolated_flag = True
 
     def _interpolateSeries(self,step:float):
         if self.count() == 0:

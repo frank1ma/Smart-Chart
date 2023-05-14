@@ -63,12 +63,15 @@ class PlotNavigator(QFrame):
         limit_range_action = QAction("Set Range to Series",self)
         add_auxiliary_v_action = QAction("Add Vertical Auxiliary Line Marker",self)
         add_auxiliary_h_action = QAction("Add Horizontal Auxiliary Line Marker",self)
+        delete_action = QAction("Delete All Vertical Line Marker",self)
         # create a action for the pop menu
         self.vertical_marker_pop_menu.addAction(add_action)
         self.vertical_marker_pop_menu.addAction(limit_range_action)
         self.vertical_marker_pop_menu.addSeparator()
         self.vertical_marker_pop_menu.addAction(add_auxiliary_v_action)
         self.vertical_marker_pop_menu.addAction(add_auxiliary_h_action)
+        self.vertical_marker_pop_menu.addSeparator()
+        self.vertical_marker_pop_menu.addAction(delete_action)
         # set the pop menu to the vertical marker button
         self.ui.vertical_marker_button.setMenu(self.vertical_marker_pop_menu)
 
@@ -79,6 +82,7 @@ class PlotNavigator(QFrame):
         limit_range_action.triggered.connect(self._limitRangeToSeries)
         add_auxiliary_v_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("vertical"))
         add_auxiliary_h_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("horizontal"))
+        delete_action.triggered.connect(self.deleteAllAuxiliaryLineMarkers)
 
         # grey out limit range action
         limit_range_action.setEnabled(False)
@@ -186,13 +190,13 @@ class PlotNavigator(QFrame):
                     # save the chart in the chartview to the file_path
                     self._saveChart(self.main_chart_view, file_path,file_type)
             except:
-                self._showLabelMsg("Save Chart Error", 3000)
+                self.showLabelMsg("Save Chart Error", 3000)
             else:
-                self._showLabelMsg("Chart Saved", 3000)
+                self.showLabelMsg("Chart Saved", 3000)
     
     def saveSeriesToCSV(self, id_list: list):
         if len(id_list) == 0:
-            self._showLabelMsg("No Series Selected", 3000)
+            self.showLabelMsg("No Series Selected", 3000)
             return
         # set the default file name in Qfiledialog
         file_dialog = QFileDialog(self)
@@ -207,9 +211,9 @@ class PlotNavigator(QFrame):
             try:
                 self._saveSeriesToCSV(id_list, file_path)
             except:
-                self._showLabelMsg("Save Series Error", 3000)
+                self.showLabelMsg("Save Series Error", 3000)
             else:
-                self._showLabelMsg("Series Saved", 3000)
+                self.showLabelMsg("Series Saved", 3000)
 
     # pan the chart
     def enablePanChart(self):
@@ -256,7 +260,7 @@ class PlotNavigator(QFrame):
         self.resetChart()
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
-        self._showLabelMsg("Default View Set and Updated")
+        self.showLabelMsg("Default View Set and Updated")
 
     # set the default range to original view from original x and y range, 
     def restoreOriginView(self):
@@ -266,13 +270,13 @@ class PlotNavigator(QFrame):
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
         # update the msg_label "Orignal View restored" and clear it after 3 seconds
-        self._showLabelMsg("Orignal View restored")
+        self.showLabelMsg("Orignal View restored")
 
     # add a vertical line marker to the chart
     def addVerticalLineMarker(self):
         # if no series in the chart, return None
         if len(self.main_chart_view.series_dict)==0:
-            self._showLabelMsg("No Series in the Chart. Please Series first.", 3000)
+            self.showLabelMsg("No Series in the Chart. Please Series first.", 3000)
             return None
         # pop up a dialog to ask for which series to add the vertical line marker, add color of series to each item
         series_name, ok = QInputDialog.getItem(self, "Select Series", "Series:", 
@@ -297,15 +301,18 @@ class PlotNavigator(QFrame):
         # if it's a horizontal line, ask for y position, if it's a vertical line, ask for x position
         if line_type=="horizontal":
             pos, ok = QInputDialog.getDouble(self, "Input Position", "Y Position:",
-                                              self.main_chart_view.chart().axisY().min()*1.5)
+                                              self.main_chart_view.chart().axisY().min()*1.5,decimals=4)
             if ok:
                 self.main_chart_view.addAuxiliaryLineMarker(line_type,pos)
         elif line_type=="vertical":
             pos, ok = QInputDialog.getDouble(self, "Input Position", "X Position:",
-                                              self.main_chart_view.chart().axisX().min()*1.5)
+                                              self.main_chart_view.chart().axisX().min()*1.5,decimals=4)
             if ok:
                 self.main_chart_view.addAuxiliaryLineMarker(line_type,pos)
         
+    def deleteAllAuxiliaryLineMarkers(self):
+        self.main_chart_view.deleteAllAuxiliaryLineMarkers()
+        return True
     # remove a series from the chart
     def removeSeries(self):
         # pop up a dialog to ask for which series to remove, add color of series to each item
@@ -320,7 +327,7 @@ class PlotNavigator(QFrame):
             # remove the series from the chart
             self.main_chart_view.removeSeries(series)
             # update the msg_label "Series Removed" and clear it after 3 seconds
-            self._showLabelMsg("Series Removed")
+            self.showLabelMsg("Series Removed")
         else:
             pass
 
@@ -345,7 +352,7 @@ class PlotNavigator(QFrame):
                                                          (self.main_chart_view.chart().axisX().max() - 
                                                         self.main_chart_view.chart().axisX().min())
 
-    def _showLabelMsg(self,message,time=3000):
+    def showLabelMsg(self,message,time=3000):
         # if message label is not empty, wait for 3 seconds and show message
         if self.ui.msg_label.text() != "":
             QTimer.singleShot(time, lambda: self.ui.msg_label.clear())
@@ -394,7 +401,7 @@ class PlotNavigator(QFrame):
         # save the dataframe to csv file
         df.to_csv(file_path)
         # update the msg_label "Series Saved" and clear it after 3 seconds
-        self._showLabelMsg("Series Saved")
+        self.showLabelMsg("Series Saved")
 
 
         
