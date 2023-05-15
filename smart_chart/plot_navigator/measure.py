@@ -261,6 +261,7 @@ class HorizontalAuxLineMarker(QLineSeries):
         pen.setStyle(Qt.PenStyle.DashLine)
         pen.setDashPattern([1,4])
         self.setPen(pen)
+        self.pen_backup = pen
         # add the horizontal line with y_value across the current x range of chart
         if self.x1_value != None and self.x2_value != None:
             self.append(QPointF(self.x1_value, self.y_value))
@@ -324,6 +325,19 @@ class HorizontalAuxLineMarker(QLineSeries):
         self.append(QPointF(self.chart_view.chart().axisX().max(), y_value))
         self.y_value = y_value
 
+    def highlightOn(self, width:float):
+        # set the width of the ALM
+        pen = self.pen()
+        pen.setWidth(width)
+        self.setPen(pen)
+    
+    def highlightOff(self):
+        # set the width of the ALM to 1
+        self.setPen(self.pen_backup)
+
+    def backupPen(self):
+        self.pen_backup = self.pen()
+
     def redraw(self):
         # redraw the ALM
         self.clear()
@@ -350,12 +364,13 @@ class VerticalAuxLineMarker(QLineSeries):
         pen.setStyle(Qt.PenStyle.DashLine)
         pen.setDashPattern([1,4])
         self.setPen(pen)
+        self.pen_backup = pen
         # add the vertical line with x_value across the current y range of chart
         if self.y_value!=None:
             self.append(QPointF(self.x_value, self.y_value*1.2))
             self.append(QPointF(self.x_value, self.y_value*0.8))
         else:
-            self.append(QPointF(self.x_value, self.chart_view.x_axis.min()))
+            self.append(QPointF(self.x_value, self.chart_view.y_axis.min()))
             self.append(QPointF(self.x_value, self.chart_view.y_axis.max()))
         self.chart_view.addSeriestoXY(self, self.chart_view.x_axis, self.chart_view.y_axis)
         self.show()
@@ -406,11 +421,23 @@ class VerticalAuxLineMarker(QLineSeries):
         self.append(QPointF(x_value, self.chart_view.y_axis.max()))
         self.x_value = x_value
 
+    def highlightOn(self, width:float):
+        # set the width of the ALM
+        pen = self.pen()
+        pen.setWidth(width)
+        self.setPen(pen)
+    
+    def highlightOff(self):
+        # set the width of the ALM to 1
+        self.setPen(self.pen_backup)
+
+    def backupPen(self):
+        self.pen_backup = self.pen()
 
     def redraw(self):
         # redraw the ALM
         self.clear()
-        self.append(QPointF(self.x_value, self.chart_view.x_axis.min()))
+        self.append(QPointF(self.x_value, self.chart_view.y_axis.min()))
         self.append(QPointF(self.x_value, self.chart_view.y_axis.max()))
     
 

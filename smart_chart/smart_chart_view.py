@@ -91,6 +91,7 @@ class SmartChartView(QChartView):
         self.interpolated_series_step = 0.01
         self.pan_x_sensitivity = 1
         self.pan_y_sensitivity = 5
+        self.last_highlighted_alm = None
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -251,10 +252,11 @@ class SmartChartView(QChartView):
             chosen_aux_line = self.findNearestAuxiliaryLine(chart_point)
             if chosen_aux_line!=None:
                 self.createAuxLineMenu(chosen_aux_line)
-            else:
-                print("blank area")
+            elif (not self.navigator.ui.measure_button.isChecked() and
+                   not self.navigator.ui.vertical_marker_button.isChecked() and
+                   not self.navigator.ui.zoom_button.isChecked()):
+                self.createAddAuxLineMenu(chart_point)
         
-
         super().mousePressEvent(event)
         QApplication.processEvents()
 
@@ -323,6 +325,22 @@ class SmartChartView(QChartView):
             self.navigator.ui.position_label.setText(f"({chart_point.x():.2f}, {chart_point.y():.2f})")
         #     ##reveal the nearest point in the series to the current mouse position
         #     #self.revealNearestPoint(chart_point)
+
+        nearest_alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker] = self.findNearestAuxiliaryLine(self.chart().mapToValue(event.position()))
+        if nearest_alm != None:
+            # highlight the nearest auxiliary line
+            self.last_highlighted_alm = nearest_alm
+            nearest_alm.highlightOn(2)
+            nearest_alm.redraw()
+            self.chart().update()
+        else:
+            if self.last_highlighted_alm != None and self.last_highlighted_alm:
+                self.last_highlighted_alm.highlightOff()
+                self.last_highlighted_alm.redraw()
+                self.chart().update()
+
+
+
         super().mouseMoveEvent(event)  # call the base class method to allow zooming by rubber band
         QApplication.processEvents()
 
@@ -398,11 +416,31 @@ class SmartChartView(QChartView):
         # add actions to menu
         menu.addAction(show_point_position_action)
         menu.addAction(change_position_action)
-        menu.addAction(delete_action)
         menu.addAction(change_color_action)
+        menu.addAction(delete_action)
+        # show menu
+        menu.popup(QCursor.pos())
+
+    # create popup menu for adding the auxiliary line marker at the blank area
+    def createAddAuxLineMenu(self, pos: QPointF):
+        # create a menu
+        menu = QMenu(self)
+        # create a add vertical auxiliary line marker action
+        add_vertical_action = QAction("Add Vertical Auxiliary Line Marker", self)
+        add_vertical_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("vertical",pos.x()))
+        # create a add horizontal auxiliary line marker action
+        add_horizontal_action = QAction("Add Horizontal Auxiliary Line Marker", self)
+        add_horizontal_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("horizontal",pos.y()))
+        # add actions to menu
+        menu.addAction(add_vertical_action)
+        menu.addAction(add_horizontal_action)
         # show menu
         menu.popup(QCursor.pos())
         
+    # calculate the cartisian distance between two points
+    def calculateDistance(self, p1: QPointF, p2: QPointF):
+        return math.sqrt((p1.x() - p2.x())**2 + (p1.y() - p2.y())**2)
+
     # find nearst vertical line marker to the given x value
     def findNearestVLM(self, x: float):
         # if there is no vertical line marker nearby with 0.05 tolerance, return None
@@ -418,31 +456,105 @@ class SmartChartView(QChartView):
         min_dis = 100
         nearst_mm = None
         for mm in self.measure_marker_dict.values():
-            # for every point on mm, find the minimum distance to the given point
-            mm_min_dis = min([abs(p.x() - point.x()) + abs(p.y() - point.y()) for p in mm.points()])
-            if min_dis > mm_min_dis:
-                min_dis = mm_min_dis
-                nearst_mm = mm
+            p1 = mm.at(0)
+            p2 = mm.at(1)
+            # if p1 p2 form a vertical line
+            if p1.x() == p2.x():
+                #if the point's y value is not between p1 and p2, the dis is the distance between the point and point that close to the point on the line between p1 and p2
+                if not (p1.y() <= point.y() <= p2.y() or p2.y() <= point.y() <= p1.y()):
+                    # return the point that is closer to point
+                    if self.calculateDistance(point, p1) <= self.calculateDistance(point, p2):
+                        close_point = p1
+                    else:
+                        close_point = p2
+                    dis = self.calculateDistance(point, close_point)
+                    dis1 = abs(point.x() - close_point.x())
+                    dis2 = abs(point.y() - close_point.y())
+                    if (dis1<0.05*(self.x_axis.max() - self.x_axis.min()) and dis2<0.05*(self.y_axis.max() - self.y_axis.min()) 
+                                and  dis < min_dis):
+                        nearst_mm = mm
+                        min_dis = dis
+                else:
+                    # if the point's y value is between p1 and p2, the dis is the distance between the point and the vertical line
+                    dis = abs(point.x() - p1.x())
+                    if dis < 0.05*(self.x_axis.max() - self.x_axis.min()) and dis < min_dis:
+                        nearst_mm = mm
+                        min_dis = dis
+            # if p1 p2 form a horizontal line
+            elif p1.y() == p2.y():
+                #if the point's x value is not between p1 and p2, the dis is the distance between the point and point that close to the point on the line between p1 and p2
+                if not (p1.x() <= point.x() <= p2.x() or p2.x() <= point.x() <= p1.x()):
+                    # return the point that is closer to point
+                    if self.calculateDistance(point, p1) <= self.calculateDistance(point, p2):
+                        close_point = p1
+                    else:
+                        close_point = p2
+                    dis = self.calculateDistance(point, close_point)
+                    dis1 = abs(point.x() - close_point.x())
+                    dis2 = abs(point.y() - close_point.y())
+                    if (dis1<0.05*(self.x_axis.max() - self.x_axis.min()) and dis2<0.05*(self.y_axis.max() - self.y_axis.min()) 
+                                and  dis < min_dis):
+                        nearst_mm = mm
+                        min_dis = dis
+                else:
+                    # if the point is on the horizontal line, return True
+                    dis = abs(point.y() - p1.y())
+                    if dis < 0.05*(self.y_axis.max() - self.y_axis.min()) and dis < min_dis:
+                        nearst_mm = mm
+                        min_dis = dis
+            # if p1 p2 form a oblique line
+            else:
+                #find the y value of the point on line between p1 and p2 with x value of point.x()
+                y = (p2.y() - p1.y()) / (p2.x() - p1.x()) * (point.x() - p1.x()) + p1.y()
+                #find the x value of the point on line between p1 and p2 with y value of point.y
+                x = (p2.x() - p1.x()) / (p2.y() - p1.y()) * (point.y() - p1.y()) + p1.x()
+                if (abs(y-point.y()) < 0.05*(self.y_axis.max() - self.y_axis.min()) and 
+                        abs(x-point.x()) < 0.05*(self.x_axis.max() - self.x_axis.min()) and
+                                math.sqrt((y-point.y())**2+(x-point.x())**2) < min_dis):
+                    nearst_mm = mm
+                    min_dis = math.sqrt((y-point.y())**2+(x-point.x())**2)
 
-        if nearst_mm !=None and min_dis < 2:
+        if nearst_mm !=None:
             return nearst_mm
         else:
             return None
     # find nearst auxiliary line to the given point value
     def findNearestAuxiliaryLine(self, point: QPointF):
+        """
+        find nearst auxiliary line to the given point value.
+        The distance is calculated by the relative distance between the point and the auxiliary line, which is in percentage.
+        The threshold is 5%, which means if the distance is less than 5%, the point is considered to be on the auxiliary line.
+        """
         # if the point is on any auxiliary line, return True
-        min_dis = 100
+        min_dis = 100000
         nearst_al = None
         for al in self.aux_line_dict.values():
             if al.__class__.__name__ == "HorizontalAuxLineMarker" and al.aux_line_mode!="measure":
-                al_min_dis = abs(al.points()[0].y() - point.y())
-            elif al.__class__.__name__ == "VerticalAuxLineMarker" and al.aux_line_mode!="measure":
-                al_min_dis = abs(al.points()[0].x() - point.x())
+                if al.points()[0].y() == 0:
+                    al_min_dis = abs(al.points()[0].y() - point.y())
+                else:
+                    al_min_dis = abs(al.points()[0].y() - point.y())/abs(al.points()[0].y())
+                if min_dis > al_min_dis:
+                    min_dis = al_min_dis
+                    nearst_al = al
+            if al.__class__.__name__ == "VerticalAuxLineMarker" and al.aux_line_mode!="measure":
+                if al.points()[0].x() == 0:
+                    al_min_dis = abs(al.points()[0].x() - point.x())
+                else:
+                    al_min_dis = abs(al.points()[0].x() - point.x())/abs(al.points()[0].x())
+                if min_dis > al_min_dis:
+                    min_dis = al_min_dis
+                    nearst_al = al
 
-            if min_dis > al_min_dis:
-                min_dis = al_min_dis
-                nearst_al = al
-        if nearst_al !=None and min_dis < 1:  # self.auxiliaryLinethreshold:
+        if nearst_al == None: return None
+        if nearst_al.__class__.__name__ == "HorizontalAuxLineMarker" and nearst_al.aux_line_mode!="measure" and  al.points()[0].y() == 0:
+            threshold = 0.05 * (self.y_axis.max() - self.y_axis.min())
+        elif nearst_al.__class__.__name__ == "VerticalAuxLineMarker" and nearst_al.aux_line_mode!="measure" and al.points()[0].x() == 0:
+            threshold = 0.05 * (self.x_axis.max() - self.x_axis.min())
+        else:
+            threshold = 0.05
+        #print("threshold:",threshold,"min_dis:",min_dis,"nearst_al:",nearst_al)
+        if min_dis <= threshold:  # self.auxiliaryLinethreshold:   
             return nearst_al
         else:
             return None
@@ -571,7 +683,9 @@ class SmartChartView(QChartView):
         color = QColorDialog.getColor()
         # if the user clicks OK, change the color of the given auxiliary line marker
         if color.isValid():
+            alm.pen_backup.setColor(color)
             alm.setColor(color)
+            
 
     # change the position of the auxiliary line marker
     def changeAuxLinePosition(self, alm:Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
