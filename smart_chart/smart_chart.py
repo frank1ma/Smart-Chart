@@ -24,9 +24,29 @@ class SmartChart(QFrame):
         self.chart_view = SmartChartView(self.chart,self)
         # add navigation bar to the smart chart
         self.nav_bar = PlotNavigator(self.chart_view)
+
+        # create a new chart
+        self.chart2 = QChart()
+        self.chart2.setTitle("My Chart2")
+        # add another chart view to the smart chart
+        self.chart_view2 = SmartChartView(self.chart2,self)
+        # add navigation bar to the smart chart
+        self.nav_bar2 = PlotNavigator(self.chart_view2)
+        self.nav_bar2.setVisible(False)
+
+        # add the chart view and navigation bar to the smart chart
         self.chart_view.setupNavigator(self.nav_bar)
+        self.chart_view2.setupNavigator(self.nav_bar2)
+
+        # add subchart to the smart chart
+        self.chart_view.setSubChat(self.chart_view2)
+
+    # setup the layout of the smart chart   
         layout.addWidget(self.nav_bar)
         layout.addWidget(self.chart_view)
+        layout.addWidget(self.nav_bar2)
+        layout.addWidget(self.chart_view2)
+
         self.setLayout(layout)
 
 class MainWindow(QMainWindow):

@@ -184,9 +184,18 @@ class SmartChartView(QChartView):
                     alm.redraw()
         self.chart().update()
 
+    # sync the x range of the sub chart with the main chart(self)
+    def updateSubChart(self):
+        if self.sub_chart != None:
+            self.sub_chart.chart().axisX().setRange(self.x_axis.min(),self.x_axis.max())
+            self.sub_chart.chart().update()
+
     # setup navigator
     def setupNavigator(self, navigator: PlotNavigator):
         self.navigator = navigator
+
+    def setSubChat(self, sub_chart:SmartChartView):
+        self.sub_chart = sub_chart
 
     def wheelEvent(self, event: QWheelEvent):
         # zoom in or out using the mouse wheel
@@ -199,6 +208,7 @@ class SmartChartView(QChartView):
         if self.navigator.ui.measure_button.isChecked():
             self.updateMarkerText()
         self.updateAuxLineMarker()
+        self.updateSubChart()
         QApplication.processEvents()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -570,7 +580,7 @@ class SmartChartView(QChartView):
         zoom_level_y = self.y_axis.max() / self.default_y_range[1]
         # pan the chart
         self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x)*delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
- 
+        self.updateSubChart()
         self.updateMarkerText()
         self.updateAuxLineMarker()
 
