@@ -1,6 +1,6 @@
 # import necessary modules in PySide6
 from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication,QMainWindow,QVBoxLayout,QListWidget,QFrame,QVBoxLayout,QLabel,QWidget,QToolBar
+from PySide6.QtWidgets import QApplication,QMainWindow,QMenu,QToolButton,QFrame,QGridLayout
 from PySide6.QtCharts import QChart, QChartView,QLineSeries
 from PySide6.QtCore import QObject, QEvent,Qt
 from PySide6.QtGui import QAction
@@ -16,7 +16,7 @@ class SmartChart(QFrame):
     def __init__(self, *args, **kwargs):
         # call super class constructor
         super().__init__(*args, **kwargs)
-        layout = QVBoxLayout(self)
+        layout = QGridLayout(self)
         # add a chart to the smart chart
         self.chart = QChart()
         self.chart.setTitle("My Chart")
@@ -40,14 +40,45 @@ class SmartChart(QFrame):
 
         # add subchart to the smart chart
         self.chart_view.setSubChat(self.chart_view2)
-
+        self.chart_view2.setVisible(False)
     # setup the layout of the smart chart   
-        layout.addWidget(self.nav_bar)
-        layout.addWidget(self.chart_view)
-        layout.addWidget(self.nav_bar2)
-        layout.addWidget(self.chart_view2)
+        layout.addWidget(self.nav_bar,0,0,1,2)
+        # add hide button to the layout
+        layout.addWidget(self.chart_view,1,0,1,3)
+
+        layout.addWidget(self.nav_bar2,2,0,1,2)
+        # add hide button to the layout
+        layout.addWidget(self.chart_view2,3,0,1,3)
 
         self.setLayout(layout)
+
+        # right click on the smart chart to pop up a menu
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+    
+    def show_context_menu(self, pos):
+        # if pos is on any chart view, return
+        if self.chart_view.geometry().contains(pos) or self.chart_view2.geometry().contains(pos):
+            return
+        menu = QMenu()
+        menu.addSeparator()
+        if self.nav_bar.isVisible():
+            menu.addAction(QAction("Hide Navigator Bar", self,triggered=self.toggleMainNavBar))
+        else:
+            menu.addAction(QAction("Show Navigator Bar", self,triggered=self.toggleMainNavBar))
+        if self.nav_bar2.isVisible():
+            menu.addAction(QAction("Hide Sub Navigator Bar", self,triggered=self.toggleSubNavBar))
+        else:
+            menu.addAction(QAction("Show Sub Navigator Bar", self,triggered=self.toggleSubNavBar))
+        menu.exec(self.mapToGlobal(pos))
+
+    def toggleMainNavBar(self):
+        self.nav_bar.setVisible(not self.nav_bar.isVisible())
+    
+    def toggleSubNavBar(self):
+        self.nav_bar2.setVisible(not self.nav_bar2.isVisible())
+        
+
 
 class MainWindow(QMainWindow):
     def __init__(self):

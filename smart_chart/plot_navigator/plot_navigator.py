@@ -63,7 +63,7 @@ class PlotNavigator(QFrame):
         limit_range_action = QAction("Set Range to Series",self)
         add_auxiliary_v_action = QAction("Add Vertical Auxiliary Line Marker",self)
         add_auxiliary_h_action = QAction("Add Horizontal Auxiliary Line Marker",self)
-        delete_action = QAction("Delete All Vertical Line Marker",self)
+        delete_action = QAction("Delete All Auxiliary Line Markers",self)
         # create a action for the pop menu
         self.vertical_marker_pop_menu.addAction(add_action)
         self.vertical_marker_pop_menu.addAction(limit_range_action)
@@ -163,6 +163,10 @@ class PlotNavigator(QFrame):
         # reset the axis
         self.main_chart_view.chart().axisX().setRange(self.main_chart_view.default_x_range[0], self.main_chart_view.default_x_range[1])
         self.main_chart_view.chart().axisY().setRange(self.main_chart_view.default_y_range[0], self.main_chart_view.default_y_range[1])
+        
+        if self.main_chart_view.sub_chart!=None:
+            self.main_chart_view.sub_chart.navigator.resetChart()
+            self.main_chart_view.updateSubChart()
 
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
@@ -267,6 +271,9 @@ class PlotNavigator(QFrame):
         self.main_chart_view.default_x_range = self.main_chart_view.original_x_range
         self.main_chart_view.default_y_range = self.main_chart_view.original_y_range
         self.resetChart()
+        if self.main_chart_view.sub_chart!=None:
+            self.main_chart_view.sub_chart.navigator.restoreOriginView()
+            self.main_chart_view.updateSubChart()
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
         # update the msg_label "Orignal View restored" and clear it after 3 seconds

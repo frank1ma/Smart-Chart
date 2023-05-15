@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QSizePolicy,QSpacerItem,QDialog, QCheckBox,QPushButton, 
+from PySide6.QtWidgets import (QSizePolicy,QSpacerItem,QDialog, QCheckBox,QPushButton,QColorDialog,
                                QVBoxLayout, QDialogButtonBox, QWidget, QScrollArea, 
                                QGridLayout, QLabel, QHBoxLayout)
 from PySide6.QtCore import Qt
@@ -43,7 +43,9 @@ class SeriesEditor(QDialog):
             legend_label = QLabel()
             legend_label.setStyleSheet("background-color: " + series.pen().color().name())
             legend_label.setFixedSize(20, 20)
-            
+
+            # double click the label to change the color of the series
+            legend_label.mouseDoubleClickEvent = lambda event,id=series.id: self.changeSerisColor(legend_label,series.id)
             hbox_layout.addWidget(checkbox)
             hbox_layout.addWidget(legend_label)
             
@@ -63,6 +65,10 @@ class SeriesEditor(QDialog):
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         self.vertical_layout.addWidget(self.button_box)
+
+    def changeSerisColor(self,label,id):
+        self.parent().main_chart_view.series_dict[id].setColor(QColorDialog.getColor())
+        label.setStyleSheet("background-color: " + self.parent().main_chart_view.series_dict[id].pen().color().name())
 
     def get_series_to_show(self):
         series_to_show = []

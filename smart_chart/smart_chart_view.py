@@ -79,6 +79,7 @@ class SmartChartView(QChartView):
 
     # init options of charts
     def initOptions(self):
+        self.sub_chart = None
         self.prev_scroll_x = 0
         self.prev_scroll_y = 0
         self.markerLimitRangeToSeries = False
@@ -92,6 +93,8 @@ class SmartChartView(QChartView):
         self.pan_x_sensitivity = 1
         self.pan_y_sensitivity = 5
         self.last_highlighted_alm = None
+        self.subchart_sync_x_axis = True
+
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -186,7 +189,7 @@ class SmartChartView(QChartView):
 
     # sync the x range of the sub chart with the main chart(self)
     def updateSubChart(self):
-        if self.sub_chart != None:
+        if self.sub_chart != None and self.subchart_sync_x_axis:
             self.sub_chart.chart().axisX().setRange(self.x_axis.min(),self.x_axis.max())
             self.sub_chart.chart().update()
 
@@ -256,16 +259,22 @@ class SmartChartView(QChartView):
                 self.current_measure_type = "horizontal"
                 self.point_selected = None
 
-        if event.button() == Qt.RightButton:
+        # right click on the blank area and show the add auxiliary line menu
+        if event.button() == Qt.RightButton and self.navigator.isVisible():
             # find nearst auxilary line
             chart_point = self.chart().mapToValue(event.position())
-            chosen_aux_line = self.findNearestAuxiliaryLine(chart_point)
-            if chosen_aux_line!=None:
-                self.createAuxLineMenu(chosen_aux_line)
-            elif (not self.navigator.ui.measure_button.isChecked() and
-                   not self.navigator.ui.vertical_marker_button.isChecked() and
-                   not self.navigator.ui.zoom_button.isChecked()):
-                self.createAddAuxLineMenu(chart_point)
+            # if chart_point is out of x and y range, return None
+            if not (chart_point.x() < self.x_axis.min() or
+                     chart_point.x() > self.x_axis.max() or 
+                     chart_point.y() < self.y_axis.min() or 
+                     chart_point.y() > self.y_axis.max()):
+                chosen_aux_line = self.findNearestAuxiliaryLine(chart_point)
+                if chosen_aux_line!=None:
+                    self.createAuxLineMenu(chosen_aux_line)
+                elif (not self.navigator.ui.measure_button.isChecked() and
+                    not self.navigator.ui.vertical_marker_button.isChecked() and
+                    not self.navigator.ui.zoom_button.isChecked()):
+                    self.createAddAuxLineMenu(chart_point)
         
         super().mousePressEvent(event)
         QApplication.processEvents()
