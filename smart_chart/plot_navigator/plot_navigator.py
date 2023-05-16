@@ -4,7 +4,7 @@ from .ui_plot_navigator import Ui_plot_navigator
 from .ui_chart_options import Ui_chart_options
 from .series_editor import SeriesEditor
 from .measure import PointMarker
-from PySide6.QtCharts import QChartView,QLineSeries
+from PySide6.QtCharts import QChartView,QLineSeries,QValueAxis,QAbstractAxis,QLogValueAxis
 from PySide6.QtCore import Qt,QTimer, QPointF, QSize, QRectF
 from PySide6.QtGui import QAction,QPixmap, QPainter, QPdfWriter,QPageSize,QShortcut,QKeySequence
 from PySide6.QtSvg import QSvgGenerator
@@ -191,8 +191,6 @@ class PlotNavigator(QFrame):
             else:
                 #self.showLabelMsg("Chart Options Update Failed")
                 pass
-        else:
-            print("Cancel")
 
 
 
@@ -380,19 +378,22 @@ class PlotNavigator(QFrame):
             self.chart_options["subchart_sync_y_axis"] = self.options_dialog.ui.checkBox_subchart_sync_y_axis.isChecked()
             # load the marker size
             self.chart_options["point_marker_size"] = self.options_dialog.ui.spinBox_point_maker_size.value()
+            # load x,y scale
+            self.chart_options["x_axis_type"] = self.options_dialog.ui.comboBox_x_scale.currentIndex()
+            self.chart_options["y_axis_type"] = self.options_dialog.ui.comboBox_y_scale.currentIndex()
 
         except ValueError:
-            self.showLabelMsg("Invalid Input", 3000)
+            self.showLabelMsg("Invalid Input", 5000)
             return False
         except Exception as e:
-            self.showLabelMsg(str(e), 3000)
+            self.showLabelMsg(str(e), 5000)
             return False
         
         if self.chart_options["x_axis_min"] >= self.chart_options["x_axis_max"]:
-            self.showLabelMsg("Error! xMin >= xMax", 3000)
+            self.showLabelMsg("Error! xMin >= xMax", 5000)
             return False
         if self.chart_options["y_axis_min"] >= self.chart_options["y_axis_max"]:
-            self.showLabelMsg("Error! yMin >= yMax", 3000)
+            self.showLabelMsg("Error! yMin >= yMax", 5000)
             return False
         try:
             # set the chart title
@@ -414,8 +415,21 @@ class PlotNavigator(QFrame):
             self.main_chart_view.subchart_sync_y_axis = self.chart_options["subchart_sync_y_axis"]
             # set the point marker size
             PointMarker.marker_size = self.chart_options["point_marker_size"]
+
+            # set the x,y scale
+            if self.chart_options["x_axis_type"] == 0:
+                x_axis_type = QAbstractAxis.AxisType.AxisTypeValue
+            elif self.chart_options["x_axis_type"] == 1:
+                x_axis_type = QAbstractAxis.AxisType.AxisTypeLogValue
+            if self.chart_options["y_axis_type"] == 0:
+                y_axis_type = QAbstractAxis.AxisType.AxisTypeValue
+            elif self.chart_options["y_axis_type"] == 1:
+                y_axis_type = QAbstractAxis.AxisType.AxisTypeLogValue
+
+            self.main_chart_view.changeAxesType(x_axis_type, y_axis_type)
+ 
         except Exception as e:
-            self.showLabelMsg(e, 3000)
+            self.showLabelMsg(str(e), 5000)
             return False
         # update the chart
         self.main_chart_view.chart().update()
@@ -471,6 +485,10 @@ class PlotNavigator(QFrame):
         # load the point marker size
         self.chart_options["point_marker_size"] = PointMarker.marker_size
 
+        # load the type of axis of x and y
+        self.chart_options["x_axis_type"] = self.main_chart_view.chart().axisX().type()
+        self.chart_options["y_axis_type"] = self.main_chart_view.chart().axisY().type()
+
     # update the self.options_dialog with the content in self.chart_options
     def updateChartOptionsForm(self,diag:QDialog):
         diag.ui.lineEdit_title.setText(self.chart_options["chart_title"])
@@ -494,7 +512,16 @@ class PlotNavigator(QFrame):
             diag.ui.checkBox_subchart_sync_y_axis.setChecked(True)
         else:
             diag.ui.checkBox_subchart_sync_y_axis.setChecked(False)
+        # update the type of axis of x and y
+        if self.chart_options["x_axis_type"] == QAbstractAxis.AxisType.AxisTypeLogValue:
+            diag.ui.comboBox_x_scale.setCurrentIndex(1)
+        elif self.chart_options["x_axis_type"] == QAbstractAxis.AxisType.AxisTypeValue:
+            diag.ui.comboBox_x_scale.setCurrentIndex(0)
         
+        if self.chart_options["y_axis_type"] == QAbstractAxis.AxisType.AxisTypeLogValue:
+            diag.ui.comboBox_y_scale.setCurrentIndex(1)
+        elif self.chart_options["y_axis_type"] == QAbstractAxis.AxisType.AxisTypeValue:
+            diag.ui.comboBox_y_scale.setCurrentIndex(0)
 
     def _limitRangeToSeries(self):
         # limit the range of the vertical line marker to the range of series

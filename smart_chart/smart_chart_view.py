@@ -59,38 +59,33 @@ class SmartChartView(QChartView):
         # set title
         self.chart().setTitle("My Chart")
 
-        # set default x y axes and add series
-        self.x_axis = QLogValueAxis()
-        self.x_axis.setBase(10)
-        self.x_axis.setMinorTickCount(-1)
-        self.x_axis.setLabelFormat("%g")
 
-        self.x_axis.setRange(0.1, 2500)
+        self.setAxesProperty()
+        # # set default x y axes and add series
+        # self.x_axis = QLogValueAxis()
+        # self.x_axis.setBase(10)
+        # self.x_axis.setMinorTickCount(-1)
+        # self.x_axis.setLabelFormat("%g")
 
-        if self.plot_type == "bode_mag":
-            self.y_axis = QValueAxis()
-            self.y_axis.setTickType(QValueAxis.TicksDynamic)
-            self.y_axis.setTickInterval(20)
-            self.y_axis.setTickAnchor(0)
-            self.y_axis.setRange(-100, 10)
-        elif self.plot_type == "bode_phase":
-            self.y_axis = QValueAxis()
-            self.y_axis.setTickType(QValueAxis.TicksDynamic)
-            self.y_axis.setTickInterval(45)
-            self.y_axis.setTickAnchor(0)
-            self.y_axis.setTickAnchor(90)
-            self.y_axis.setTickAnchor(-90)
-            self.y_axis.setTickAnchor(180)
-            self.y_axis.setTickAnchor(-180)
-            self.y_axis.setRange(-180, 180)
+        # self.x_axis.setRange(0.1, 2500)
 
-        #default_series.addData(1,1)
-        #self.addSeriestoXY(default_series, self.x_axis, self.y_axis,True)
-        #self.chart().legend().markers(default_series)[0].setVisible(False)
-        # set a proper range for x and y axes according to the data added
+        # if self.plot_type == "bode_mag":
+        #     self.y_axis = QValueAxis()
+        #     self.y_axis.setTickType(QValueAxis.TicksDynamic)
+        #     self.y_axis.setTickInterval(20)
+        #     self.y_axis.setTickAnchor(0)
+        #     self.y_axis.setRange(-100, 10)
+        # elif self.plot_type == "bode_phase":
+        #     self.y_axis = QValueAxis()
+        #     self.y_axis.setTickType(QValueAxis.TicksDynamic)
+        #     self.y_axis.setTickInterval(45)
+        #     self.y_axis.setTickAnchor(0)
+        #     self.y_axis.setTickAnchor(90)
+        #     self.y_axis.setTickAnchor(-90)
+        #     self.y_axis.setTickAnchor(180)
+        #     self.y_axis.setTickAnchor(-180)
+        #     self.y_axis.setRange(-180, 180)
         
-        
-
     # init options of charts
     def initOptions(self):
         self.sub_chart = None
@@ -123,19 +118,11 @@ class SmartChartView(QChartView):
             self.chart().legend().markers(series)[0].setVisible(False)
 
     def plotXY(self,x,y,series:SmartLineSeries= None):
+        self.setAxesProperty(x, y)
         if series == None:
             series = self.addNewSeries()
         self.updateSeries(series,x,y)
-        self.x_axis.setRange(min(x),max(x))
-        if self.plot_type == "bode_mag":
-            self.y_axis.setTickType(QValueAxis.TicksDynamic)
-            self.y_axis.setTickInterval(20)
-            self.y_axis.setTickAnchor(0)
-            self.y_axis.setRange(min(y)-20,max(y)+40)
-        elif self.plot_type == "bode_phase":
-            self.y_axis.setRange(-180,max(y)+20)
         self.updateDefaultRange()
-        #series.updateProperty() # add interpolated version of series if necessary
 
     def addNewSeries(self):
         # create a new series
@@ -385,6 +372,12 @@ class SmartChartView(QChartView):
     def createVLMMenu(self, vlm: VerticalLineMarker):
         # create a menu
         menu = QMenu(self)
+        # create a change position action
+        change_position_action = QAction("Change Position", self)
+        change_position_action.triggered.connect(lambda: self.changeVLMPosition(vlm))
+        # create a change width action
+        change_width_action = QAction("Change Width", self)
+        change_width_action.triggered.connect(lambda: self.changeVLMWidth(vlm))
         # create a change color action
         change_color_action = QAction("Change Color", self)
         change_color_action.triggered.connect(lambda: self.changeVLMColor(vlm))
@@ -393,8 +386,10 @@ class SmartChartView(QChartView):
         delete_action.triggered.connect(lambda: self.deleteVerticalLineMarker(vlm))
         
         # add actions to menu
-        menu.addAction(delete_action)
+        menu.addAction(change_position_action)
+        menu.addAction(change_width_action)
         menu.addAction(change_color_action)
+        menu.addAction(delete_action)
         # show menu
         menu.popup(QCursor.pos())
 
@@ -735,6 +730,26 @@ class SmartChartView(QChartView):
         if color.isValid():
             vlm.setColor(color)
 
+    # change the width of the given vertical line marker
+    def changeVLMWidth(self, vlm: VerticalLineMarker):
+        # open a dialog to get the new width
+        new_width, ok = QInputDialog.getDouble(self, "Change Width", "New Width", vlm.pen().widthF(),
+                                                0.0, sys.float_info.max, decimals=4)
+        # if the user clicks OK, change the width of the given vertical line marker
+        if ok:
+            pen = QPen()
+            pen.setColor(vlm.color())
+            pen.setWidthF(new_width)
+            vlm.setPen(pen)
+
+    # change the position of the vertical line marker
+    def changeVLMPosition(self, vlm: VerticalLineMarker):
+        # open a dialog to get the new position
+        new_pos, ok = QInputDialog.getDouble(self, "Change Position", "New Position", vlm.at(0).x(),
+                                                -sys.float_info.max, sys.float_info.max, decimals=4)
+        # if the user clicks OK, change the position of the vertical line marker
+        if ok:
+            vlm.updateVLM(new_pos)
     # change the color of the given auxiliary line marker
     def changeAuxLineColor(self, alm: Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
         # open a color dialog
@@ -849,6 +864,133 @@ class SmartChartView(QChartView):
                     y = point1.y()+(point2.y()-point1.y())*(alm.x_value-point1.x())/(point2.x()-point1.x())
                     intersection_point.append(QPointF(alm.x_value,y))
         return intersection_point
+    
+    def setAxesProperty(self, x_data:Union[list,np.ndarray]=[0.1,2500], y_data:Union[list,np.ndarray]=[0,100],
+                        x_label:str="",y_label:str=""):
+        # set default x y axes
+        if self.plot_type == "bode_mag":
+            self.x_axis = QLogValueAxis()
+            self.x_axis.setBase(10)
+            self.x_axis.setRange(0.1, 2500)
+            self.x_axis.setMinorTickCount(-1)
+            self.x_axis.setLabelFormat("%g")
+            self.x_axis.setTitleText(x_label)
+
+            self.y_axis = QValueAxis()
+            self.y_axis.setLabelFormat("%g")
+            self.y_axis.setRange(min(y_data)-20,max(y_data)+40)
+            self.y_axis.setTickType(QValueAxis.TicksDynamic)
+            self.y_axis.setTickInterval(20)
+            self.y_axis.setTickAnchor(0)
+            self.y_axis.setTitleText(y_label)
+            
+        elif self.plot_type == "bode_phase":
+            self.x_axis = QLogValueAxis()
+            self.x_axis.setBase(10)
+            self.x_axis.setRange(0.1, 2500)
+            self.x_axis.setMinorTickCount(-1)
+            self.x_axis.setLabelFormat("%g")
+            self.x_axis.setTitleText(x_label)
+            
+            self.y_axis = QValueAxis()
+            self.y_axis.setTickType(QValueAxis.TicksDynamic)
+            self.y_axis.setTickInterval(45)
+            self.y_axis.setTickAnchor(0)
+            self.y_axis.setTickAnchor(90)
+            self.y_axis.setTickAnchor(-90)
+            self.y_axis.setTickAnchor(180)
+            self.y_axis.setTickAnchor(-180)
+            self.y_axis.setRange(-180, 180)
+            self.y_axis.setTitleText(y_label)
+
+        elif self.plot_type == "normal":
+            self.x_axis = QValueAxis()
+            self.x_axis.setLabelFormat("%g")
+            self.x_axis.setRange(min(x_data),max(x_data))
+            self.x_axis.setTitleText(x_label)
+            self.x_axis.setTickType(QValueAxis.TicksDynamic)
+            self.x_axis.setTickInterval(10)
+
+            self.y_axis = QValueAxis()
+            self.y_axis.setLabelFormat("%g")
+            self.y_axis.setRange(min(y_data),max(y_data))
+            self.x_axis.setTitleText(y_label)
+            self.y_axis.setTickType(QValueAxis.TicksDynamic)
+            self.y_axis.setTickInterval(10)
+        #series.updateProperty() # add interpolated version of series if necessary
+
+    def changeAxesType(self,new_x_axis_type,new_y_axis_type):
+        if new_x_axis_type == "log":
+            new_x_axis_type = QAbstractAxis.AxisType.AxisTypeLogValue
+        elif new_x_axis_type == "linear":
+            new_x_axis_type = QAbstractAxis.AxisType.AxisTypeValue
+        if new_y_axis_type == "log":
+            new_y_axis_type = QAbstractAxis.AxisType.AxisTypeLogValue
+        elif new_y_axis_type == "linear":
+            new_y_axis_type = QAbstractAxis.AxisType.AxisTypeValue
+        
+        if new_x_axis_type not in [QAbstractAxis.AxisType.AxisTypeLogValue,QAbstractAxis.AxisType.AxisTypeValue] or \
+            new_y_axis_type not in [QAbstractAxis.AxisType.AxisTypeLogValue,QAbstractAxis.AxisType.AxisTypeValue]:
+            return 
+
+        if new_x_axis_type == self.x_axis.type() and new_y_axis_type == self.y_axis.type():
+            return
+        change_X = False
+        change_Y = False
+        if new_x_axis_type != self.x_axis.type():
+            if new_x_axis_type == QAbstractAxis.AxisType.AxisTypeLogValue:
+                self.x_axis = QLogValueAxis()
+                self.x_axis.setBase(10)
+                self.x_axis.setRange(self.x_axis.min(), self.x_axis.max())
+                self.x_axis.setMinorTickCount(-1)
+                self.x_axis.setLabelFormat("%g")
+                self.x_axis.setTitleText(self.x_axis.titleText())
+            elif new_x_axis_type == QAbstractAxis.AxisType.AxisTypeValue:
+                self.x_axis = QValueAxis()
+                self.x_axis.setLabelFormat("%g")
+                self.x_axis.setRange(self.x_axis.min(), self.x_axis.max())
+                self.x_axis.setTickCount(10)
+                self.x_axis.setTickInterval(10)
+                self.x_axis.setTitleText(self.x_axis.titleText())
+            change_X = True
+
+        if new_y_axis_type != self.y_axis.type():
+            print(new_y_axis_type,self.y_axis.type())
+            if new_y_axis_type == QAbstractAxis.AxisType.AxisTypeLogValue:
+                self.y_axis = QLogValueAxis()
+                self.y_axis.setBase(10)
+                self.y_axis.setRange(self.y_axis.min(), self.y_axis.max())
+                self.y_axis.setMinorTickCount(-1)
+                self.y_axis.setLabelFormat("%g")
+                self.y_axis.setTitleText(self.y_axis.titleText())
+            elif new_y_axis_type == QAbstractAxis.AxisType.AxisTypeValue:
+                self.y_axis = QValueAxis()
+                self.y_axis.setLabelFormat("%g")
+                self.y_axis.setRange(self.y_axis.min(), self.y_axis.max())
+                self.y_axis.setTickType(QValueAxis.TicksDynamic)
+                self.y_axis.setTickInterval(10)
+                self.y_axis.setTitleText(self.y_axis.titleText())
+            change_Y  = True
+        
+        if change_X:
+            for series in self.series_dict.values():
+                if series._isNegValueContained() and new_x_axis_type == QAbstractAxis.AxisType.AxisTypeLogValue:
+                    self.navigator.showLabelMsg("Negative value is contained in the series, cannot change to log value axis")
+                    return
+                self.chart().setAxisX(self.x_axis, series)
+        elif change_Y:
+            for series in self.series_dict.values():
+                if series._isNegValueContained() and new_y_axis_type == QAbstractAxis.AxisType.AxisTypeLogValue:
+                    self.navigator.showLabelMsg("Negative value is contained in the series, cannot change to log value axis")
+                    return
+                self.chart().setAxisY(self.y_axis, series)
+                #self.chart().setAxisY(self.y_axis, series)
+        
+        
+        self.chart().update()
+        #self.updateSubChart()
+        #self.updateMarkerText()
+        #self.updateAuxLineMarker()
 
     # show the next intersection point of the given auxiliary line marker
     def showNextIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
@@ -1041,8 +1183,13 @@ class SmartLineSeries(QLineSeries):
                 # Linear interpolation
                 y_value = y1 + (x_value - x1) * (y2 - y1) / (x2 - x1)
                 return y_value
-
         return None
+    
+    def _isNegValueContained(self):
+        for point in self.points():
+            if point.y()<0:
+                return True
+        return False
 class VerticalLineMarker(QLineSeries):
     instance_count = 0
     id_pool = set()

@@ -101,5 +101,6 @@ if __name__ == "__main__":
 
     widget:SmartChart = window.centralWidget()
     widget.chart_view.plotXY(omega,20*np.log10(mag))
+    widget.chart_view.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")
     widget.chart_view2.plotXY(omega,phase/np.pi*180)
     app.exec()

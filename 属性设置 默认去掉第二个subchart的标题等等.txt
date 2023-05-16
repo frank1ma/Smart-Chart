@@ -2,6 +2,10 @@
 
 meausre mode一次只能激活一次测量
 
-log plot ticks设计
+log plot ticks设计 基本完成 
 
 support scatter
+
+measure mark text的位置并不好
+
+两条辅助线 交叉 有一条无法选中  在maximize window的时候
