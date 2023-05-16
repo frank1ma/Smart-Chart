@@ -22,26 +22,26 @@ class SmartChart(QFrame):
         self.chart = QChart()
         self.chart.setTitle("My Chart")
         # add chart to the chart view
-        self.chart_view = SmartChartView(self.chart,self)
+        self.chart_view = SmartChartView(self.chart,self,"bode_mag")
         # add navigation bar to the smart chart
         self.nav_bar = PlotNavigator(self.chart_view)
 
         # create a new chart
-        #self.chart2 = QChart()
-        #self.chart2.setTitle("My Chart2")
+        self.chart2 = QChart()
+        self.chart2.setTitle("My Chart2")
         # add another chart view to the smart chart
-        #self.chart_view2 = SmartChartView(self.chart2,self)
+        self.chart_view2 = SmartChartView(self.chart2,self,"bode_phase")
         # add navigation bar to the smart chart
-        #self.nav_bar2 = PlotNavigator(self.chart_view2)
-        #self.nav_bar2.setVisible(False)
+        self.nav_bar2 = PlotNavigator(self.chart_view2)
+        self.nav_bar2.setVisible(False)
 
         # add the chart view and navigation bar to the smart chart
         self.chart_view.setupNavigator(self.nav_bar)
-        #self.chart_view2.setupNavigator(self.nav_bar2)
+        self.chart_view2.setupNavigator(self.nav_bar2)
 
         # add subchart to the smart chart
-        #self.chart_view.setSubChat(self.chart_view2)
-        #self.chart_view2.setSubChat(self.chart_view)
+        self.chart_view.setSubChat(self.chart_view2)
+        self.chart_view2.setSubChat(self.chart_view)
 
         #self.chart_view.plotXY([1,2,3],[1,2,3])
     # setup the layout of the smart chart   
@@ -49,9 +49,9 @@ class SmartChart(QFrame):
         # add hide button to the layout
         layout.addWidget(self.chart_view,1,0,1,3)
 
-        #layout.addWidget(self.nav_bar2,2,0,1,2)
+        layout.addWidget(self.nav_bar2,2,0,1,2)
         # add hide button to the layout
-        #layout.addWidget(self.chart_view2,3,0,1,3)
+        layout.addWidget(self.chart_view2,3,0,1,3)
 
         self.setLayout(layout)
 
@@ -96,10 +96,10 @@ if __name__ == "__main__":
     window.setGeometry(800, 400, 800, 600)
     window.show()
     
-    sys1 = control.tf([1], [1,2,1])
-    mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,1000),omega_num=500,plot=False)
+    sys1 = control.tf([10], [1,1])
+    mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
 
     widget:SmartChart = window.centralWidget()
-    widget.chart_view.plotXY(omega,20*np.log10(mag),series=widget.chart_view.chart().series()[0])
-    #widget.chart_view2.plotXY(omega,phase,series=widget.chart_view.chart().series()[0])
+    widget.chart_view.plotXY(omega,20*np.log10(mag))
+    widget.chart_view2.plotXY(omega,phase/np.pi*180)
     app.exec()

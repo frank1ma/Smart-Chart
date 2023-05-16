@@ -13,18 +13,15 @@ import control
 
 class SmartChartView(QChartView):
 
-    def __init__(self, chart: QChart,parent=None):
-        print(chart)
+    def __init__(self, chart: QChart,parent=None,plot_type="bode_mag"):
         super().__init__(chart,parent)
+        self.plot_type = plot_type
         self.setRenderHint(QPainter.Antialiasing)
         self.setInteractive(True)
         self.initOptions()
         self.initGraphicsGroup()
         self.initChart()
         self.updateDefaultRange()
-        for marker in self.chart().legend().markers():
-            if marker.label()=="":
-                marker.setVisible(False)
 
     def initGraphicsGroup(self):
         # add a dictionario to store all series for data
@@ -42,12 +39,14 @@ class SmartChartView(QChartView):
     # initialize the chart
     def initChart(self):
         #add a default series to self.series_dict
-        default_series = SmartLineSeries(self,"Default Series")
-        self.series_dict[default_series.id] = default_series
+        #default_series = SmartLineSeries(self,"Default Series")
+        #self.series_dict[default_series.id] = default_series
 
         # add 5000 random points to default series
         # for i in range(1,1000):
         #     default_series.addData(np.log10(i),100*math.sin(i))
+
+        # add transfer function to default series
         # sys1 = control.tf([1], [1,2,1])
         # mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,1000),omega_num=500,plot=False)
 
@@ -65,26 +64,33 @@ class SmartChartView(QChartView):
         self.x_axis.setBase(10)
         self.x_axis.setMinorTickCount(-1)
         self.x_axis.setLabelFormat("%g")
-        self.y_axis = QValueAxis()
+
+        self.x_axis.setRange(0.1, 2500)
+
+        if self.plot_type == "bode_mag":
+            self.y_axis = QValueAxis()
+            self.y_axis.setTickType(QValueAxis.TicksDynamic)
+            self.y_axis.setTickInterval(20)
+            self.y_axis.setTickAnchor(0)
+            self.y_axis.setRange(-100, 10)
+        elif self.plot_type == "bode_phase":
+            self.y_axis = QValueAxis()
+            self.y_axis.setTickType(QValueAxis.TicksDynamic)
+            self.y_axis.setTickInterval(45)
+            self.y_axis.setTickAnchor(0)
+            self.y_axis.setTickAnchor(90)
+            self.y_axis.setTickAnchor(-90)
+            self.y_axis.setTickAnchor(180)
+            self.y_axis.setTickAnchor(-180)
+            self.y_axis.setRange(-180, 180)
 
         #default_series.addData(1,1)
-        self.addSeriestoXY(default_series, self.x_axis, self.y_axis,True)
+        #self.addSeriestoXY(default_series, self.x_axis, self.y_axis,True)
         #self.chart().legend().markers(default_series)[0].setVisible(False)
         # set a proper range for x and y axes according to the data added
-        self.x_axis.setRange(0.1, 1000)
-        self.y_axis.setRange(-100, 100)
-        #self.x_axis.setRange(0.1, 2000)
-        #self.y_axis.setRange(self.y_axis.min(), self.y_axis.max())
-        # set legend text
-        default_series.setName(default_series.label)
-        # #self.x_axis.setTickCount(11)
-        # self.x_axis.setMinorTickCount(4)
-        # self.x_axis.setTickAnchor(1)
-        # self.x_axis.setTickAnchor(10)
-        # self.x_axis.setTickAnchor(100)
-        # self.x_axis.setTickAnchor(1000)
-        # self.x_axis.setLabels(['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'])
-        default_series.updateProperty()
+        
+        
+
     # init options of charts
     def initOptions(self):
         self.sub_chart = None
@@ -97,7 +103,7 @@ class SmartChartView(QChartView):
         self.is_point_near_threshold_y = 0.1
         self.interpolated_series_step = 0.01
         self.pan_x_sensitivity = 1
-        self.pan_y_sensitivity = 5
+        self.pan_y_sensitivity = 1
         self.last_highlighted_alm = None
         self.subchart_sync_x_axis = True
         self.subchart_sync_y_axis = True
@@ -120,14 +126,21 @@ class SmartChartView(QChartView):
         if series == None:
             series = self.addNewSeries()
         self.updateSeries(series,x,y)
-        series.updateProperty() # add interpolated version of series if necessary
+        self.x_axis.setRange(min(x),max(x))
+        if self.plot_type == "bode_mag":
+            self.y_axis.setTickType(QValueAxis.TicksDynamic)
+            self.y_axis.setTickInterval(20)
+            self.y_axis.setTickAnchor(0)
+            self.y_axis.setRange(min(y)-20,max(y)+40)
+        elif self.plot_type == "bode_phase":
+            self.y_axis.setRange(-180,max(y)+20)
+        self.updateDefaultRange()
+        #series.updateProperty() # add interpolated version of series if necessary
 
     def addNewSeries(self):
-        print("add new series！")
         # create a new series
         new_series = SmartLineSeries(self,f"Series {len(self.series_dict)}")
         # add series to self.series_dict
-        print("id",new_series.id)
         self.series_dict[new_series.id] = new_series
         # add series to chart
         self.addSeriestoXY(new_series, self.x_axis, self.y_axis,True)
@@ -222,7 +235,7 @@ class SmartChartView(QChartView):
         if self.navigator.ui.measure_button.isChecked():
             self.updateMarkerText()
         self.updateAuxLineMarker()
-        #self.updateSubChart()
+        self.updateSubChart()
         QApplication.processEvents()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -241,7 +254,6 @@ class SmartChartView(QChartView):
 
         elif event.button() == Qt.LeftButton and self.navigator.ui.vertical_marker_button.isChecked():
             chart_point_x = self.chart().mapToValue(event.position()).x()
-            #line_start_x = self.vertical_marker_dict[1].at(0).x()
             chosen_VLM = self.findNearestVLM(chart_point_x)
             if chosen_VLM!=None:
                 chosen_VLM.is_line_dragging = True
@@ -310,7 +322,7 @@ class SmartChartView(QChartView):
         if self.navigator.ui.vertical_marker_button.isChecked():
             self.updateAllVLM()
         self.setDragMode(QChartView.NoDrag)
-        #self.updateSubChart()
+        self.updateSubChart()
         super().mouseReleaseEvent(event)        
         QApplication.processEvents()
 
@@ -487,7 +499,7 @@ class SmartChartView(QChartView):
     # find nearst vertical line marker to the given x value
     def findNearestVLM(self, x: float):
         # if there is no vertical line marker nearby with 0.05 tolerance, return None
-        if min([abs(vlm.at(0).x() - x) for vlm in self.vertical_marker_dict.values()]) > 0.05:
+        if min([abs(vlm.at(0).x() - x) for vlm in self.vertical_marker_dict.values()]) > 0.05*(self.x_axis.max()-self.x_axis.min()):
             return None
         # find the vertical line marker with the minimum distance to the given x value
         nearest_vlm = min(self.vertical_marker_dict.values(), key=lambda vlm: abs(vlm.at(0).x() - x))
@@ -607,13 +619,16 @@ class SmartChartView(QChartView):
         # convert the mouse position to a chart point
         chart_point = self.chart().mapToValue(event.position())
         # pan the chart by the difference between the last mouse position and the current mouse position
-        delta = chart_point - self.last_mouse_pos
+        try:
+            delta = chart_point - self.last_mouse_pos
+        except:
+            delta = QPointF(0,0)
         # the pan sensitivity is inversely proportional to the zoom level
         zoom_level_x = self.x_axis.max() / self.default_x_range[1]
         zoom_level_y = self.y_axis.max() / self.default_y_range[1]
         # pan the chart
         self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x)*delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
-        #self.updateSubChart()
+        self.updateSubChart()
         self.updateMarkerText()
         self.updateAuxLineMarker()
 

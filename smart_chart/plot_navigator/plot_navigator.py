@@ -205,7 +205,7 @@ class PlotNavigator(QFrame):
         self.main_chart_view.chart().axisY().setRange(self.main_chart_view.default_y_range[0], self.main_chart_view.default_y_range[1])
         
         if self.main_chart_view.sub_chart!=None:
-            #self.main_chart_view.updateSubChart()
+            self.main_chart_view.updateSubChart()
             pass
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
@@ -312,7 +312,7 @@ class PlotNavigator(QFrame):
         self.resetChart()
         if self.main_chart_view.sub_chart!=None:
             self.main_chart_view.sub_chart.navigator.restoreOriginView()
-            #self.main_chart_view.updateSubChart()
+            self.main_chart_view.updateSubChart()
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
         # update the msg_label "Orignal View restored" and clear it after 3 seconds
@@ -324,23 +324,27 @@ class PlotNavigator(QFrame):
         if len(self.main_chart_view.series_dict)==0:
             self.showLabelMsg("No Series in the Chart. Please Series first.", 3000)
             return None
-        # pop up a dialog to ask for which series to add the vertical line marker, add color of series to each item
-        series_name, ok = QInputDialog.getItem(self, "Select Series", "Series:", 
-                                               [f"{series.label} ({str(series.id)})" for 
-                                                series in self.main_chart_view.series_dict.values()], 0, False)
-        if ok:
-            # extract series.id from series_name
-            series_id = int(series_name.split("(")[-1].split(")")[0])
-            # get the series from series_id
-            series = self.main_chart_view.series_dict[series_id]
-            vertical_line_marker = self.main_chart_view.addVerticalLineMarker(series,self.main_chart_view.chart().axisX().min()*1.2)
-            vertical_line_marker.updateVLM(vertical_line_marker.last_vertical_line_x_pos)
-            # if vertical_marker_button is not checked, check it
-            if not self.ui.vertical_marker_button.isChecked():
-                self.ui.vertical_marker_button.setChecked(True)
-            return vertical_line_marker
+        if len(self.main_chart_view.series_dict)>1:
+            # pop up a dialog to ask for which series to add the vertical line marker, add color of series to each item
+            series_name, ok = QInputDialog.getItem(self, "Select Series", "Series:", 
+                                                [f"{series.label} ({str(series.id)})" for 
+                                                    series in self.main_chart_view.series_dict.values()], 0, False)
+            if ok:
+                # extract series.id from series_name
+                series_id = int(series_name.split("(")[-1].split(")")[0])
+                # get the series from series_id
+                series = self.main_chart_view.series_dict[series_id]
+            else:
+                return None
         else:
-            return None
+            series = list(self.main_chart_view.series_dict.values())[0]
+        vertical_line_marker = self.main_chart_view.addVerticalLineMarker(series,self.main_chart_view.chart().axisX().min()*1.2)
+        vertical_line_marker.updateVLM(vertical_line_marker.last_vertical_line_x_pos)
+        # if vertical_marker_button is not checked, check it
+        if not self.ui.vertical_marker_button.isChecked():
+            self.ui.vertical_marker_button.setChecked(True)
+        return vertical_line_marker
+
         
     def addAuxiliaryLineMarker(self,line_type:str):
         # pop up a dialog to input the position of the auxiliary line marker according to line_type
