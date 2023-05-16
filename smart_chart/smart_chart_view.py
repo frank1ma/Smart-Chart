@@ -2,15 +2,19 @@ from __future__ import annotations
 from typing import Any,Optional,Union
 from plot_navigator.plot_navigator import PlotNavigator
 from plot_navigator.measure import Measure,MeasureMarker,PointMarker,VerticalAuxLineMarker,HorizontalAuxLineMarker
-from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries,QScatterSeries
+from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries,QScatterSeries,QLogValueAxis,QAbstractAxis
 from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor
 from PySide6.QtCore import Qt,QEvent,QPointF
 from PySide6.QtWidgets import QGraphicsEllipseItem,QGraphicsTextItem,QApplication,QMenu,QColorDialog,QInputDialog
 import math
 import sys
+import numpy as np
+import control
+
 class SmartChartView(QChartView):
 
     def __init__(self, chart: QChart,parent=None):
+        print(chart)
         super().__init__(chart,parent)
         self.setRenderHint(QPainter.Antialiasing)
         self.setInteractive(True)
@@ -18,7 +22,6 @@ class SmartChartView(QChartView):
         self.initGraphicsGroup()
         self.initChart()
         self.updateDefaultRange()
-        #self.plotXY([1,2,3],[3,4,5])
         for marker in self.chart().legend().markers():
             if marker.label()=="":
                 marker.setVisible(False)
@@ -43,21 +46,14 @@ class SmartChartView(QChartView):
         self.series_dict[default_series.id] = default_series
 
         # add 5000 random points to default series
-        for i in range(500):
-            default_series.addData(i,math.sin(i/10))
+        # for i in range(1,1000):
+        #     default_series.addData(np.log10(i),100*math.sin(i))
+        # sys1 = control.tf([1], [1,2,1])
+        # mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,1000),omega_num=500,plot=False)
 
-        # add some sample data to default series
-        # default_series.append(1,5)
-        # default_series.append(2,7)
-        # default_series.append(3,9)
-        # default_series.append(4,1)
-        # default_series.append(5,3)
-        # default_series.append(6,5)
-        # default_series.append(7,7)
-        # default_series.append(8,9)
-        # default_series.append(9,1)
+        # for i in range(len(mag)):
+        #     default_series.addData(omega[i],20*np.log10(mag[i]))
 
-        # set legend
         self.chart().legend().setVisible(True)
         self.chart().legend().setAlignment(Qt.AlignBottom)
 
@@ -65,23 +61,33 @@ class SmartChartView(QChartView):
         self.chart().setTitle("My Chart")
 
         # set default x y axes and add series
-        self.x_axis = QValueAxis()
+        self.x_axis = QLogValueAxis()
+        self.x_axis.setBase(10)
+        self.x_axis.setMinorTickCount(-1)
+        self.x_axis.setLabelFormat("%g")
         self.y_axis = QValueAxis()
+
+        #default_series.addData(1,1)
         self.addSeriestoXY(default_series, self.x_axis, self.y_axis,True)
-
+        #self.chart().legend().markers(default_series)[0].setVisible(False)
         # set a proper range for x and y axes according to the data added
-        self.x_axis.setRange(self.x_axis.min(), self.x_axis.max())
-        self.y_axis.setRange(self.y_axis.min(), self.y_axis.max())
-
+        self.x_axis.setRange(0.1, 1000)
+        self.y_axis.setRange(-100, 100)
+        #self.x_axis.setRange(0.1, 2000)
+        #self.y_axis.setRange(self.y_axis.min(), self.y_axis.max())
         # set legend text
         default_series.setName(default_series.label)
+        # #self.x_axis.setTickCount(11)
+        # self.x_axis.setMinorTickCount(4)
+        # self.x_axis.setTickAnchor(1)
+        # self.x_axis.setTickAnchor(10)
+        # self.x_axis.setTickAnchor(100)
+        # self.x_axis.setTickAnchor(1000)
+        # self.x_axis.setLabels(['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'])
         default_series.updateProperty()
-
     # init options of charts
     def initOptions(self):
         self.sub_chart = None
-        self.prev_scroll_x = 0
-        self.prev_scroll_y = 0
         self.markerLimitRangeToSeries = False
         self.vlm_selected = None
         self.point_marker = None 
@@ -94,7 +100,7 @@ class SmartChartView(QChartView):
         self.pan_y_sensitivity = 5
         self.last_highlighted_alm = None
         self.subchart_sync_x_axis = True
-
+        self.subchart_sync_y_axis = True
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -103,7 +109,7 @@ class SmartChartView(QChartView):
         self.original_x_range = self.default_x_range
         self.original_y_range = self.default_y_range
     
-    def addSeriestoXY(self, series: QLineSeries, x_axis: QValueAxis, y_axis: QValueAxis,legend_visible = False):
+    def addSeriestoXY(self, series: QLineSeries, x_axis: QAbstractAxis, y_axis: QAbstractAxis,legend_visible = False):
         self.chart().addSeries(series)
         self.chart().setAxisX(x_axis, series)
         self.chart().setAxisY(y_axis, series)
@@ -117,9 +123,11 @@ class SmartChartView(QChartView):
         series.updateProperty() # add interpolated version of series if necessary
 
     def addNewSeries(self):
+        print("add new series！")
         # create a new series
         new_series = SmartLineSeries(self,f"Series {len(self.series_dict)}")
         # add series to self.series_dict
+        print("id",new_series.id)
         self.series_dict[new_series.id] = new_series
         # add series to chart
         self.addSeriestoXY(new_series, self.x_axis, self.y_axis,True)
@@ -152,9 +160,8 @@ class SmartChartView(QChartView):
         # create a new measure marker
         if self.active_measure_marker == None:
                 self.active_measure_marker = MeasureMarker(self,Measure())
-        if self.point_selected == None:
-            self.point_selected = self.chart().mapToValue(event.position())
-        finish_flag = self.active_measure_marker.setPoint(self.point_selected)
+        point_selected = self.chart().mapToValue(event.position())
+        finish_flag = self.active_measure_marker.setPoint(point_selected)
         if finish_flag:
             marker = self.active_measure_marker
             if self.current_measure_type == "horizontal":
@@ -192,6 +199,10 @@ class SmartChartView(QChartView):
         if self.sub_chart != None and self.subchart_sync_x_axis:
             self.sub_chart.chart().axisX().setRange(self.x_axis.min(),self.x_axis.max())
             self.sub_chart.chart().update()
+        if self.sub_chart != None and self.subchart_sync_y_axis:
+            self.sub_chart.chart().axisY().setRange(self.y_axis.min()/self.default_y_range[0]*self.sub_chart.default_y_range[0],
+                                                    self.y_axis.max()/self.default_y_range[1]*self.sub_chart.default_y_range[1])
+            self.sub_chart.chart().update()
 
     # setup navigator
     def setupNavigator(self, navigator: PlotNavigator):
@@ -211,7 +222,7 @@ class SmartChartView(QChartView):
         if self.navigator.ui.measure_button.isChecked():
             self.updateMarkerText()
         self.updateAuxLineMarker()
-        self.updateSubChart()
+        #self.updateSubChart()
         QApplication.processEvents()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -239,6 +250,7 @@ class SmartChartView(QChartView):
         # if left click on the measure button, create a new measure marker
         elif event.button() == Qt.LeftButton and self.navigator.ui.measure_button.isChecked():
             self.addMeasureMarker(event)
+            self.updateMarkerText()
 
         #if right click on the vertical line marker, popups a menu
         elif event.button() == Qt.RightButton and self.navigator.ui.vertical_marker_button.isChecked():
@@ -298,6 +310,7 @@ class SmartChartView(QChartView):
         if self.navigator.ui.vertical_marker_button.isChecked():
             self.updateAllVLM()
         self.setDragMode(QChartView.NoDrag)
+        #self.updateSubChart()
         super().mouseReleaseEvent(event)        
         QApplication.processEvents()
 
@@ -327,16 +340,6 @@ class SmartChartView(QChartView):
                 self.setCursor(Qt.CursorShape.SizeHorCursor)
             else:
                 self.setCursor(Qt.CursorShape.ArrowCursor)
-        
-        #if self.navigator.ui.measure_button.isChecked():
-        elif self.navigator.ui.measure_button.isChecked():
-            chart_point = self.chart().mapToValue(event.position())
-            self.point_selected = self.revealNearestSinglePoint(chart_point)
-            #chart_point = self.chart().mapToValue(event.position())
-            if self.point_selected != None:
-                self.navigator.ui.position_label.setText(f"({self.point_selected.x():.2f}, {self.point_selected.y():.2f})")
-            else:
-                self.navigator.ui.position_label.setText(f"({chart_point.x():.2f}, {chart_point.y():.2f})")
             
         # show the current mouse position in the position_label of the navigator, 2 decimal places
         else:
@@ -358,10 +361,13 @@ class SmartChartView(QChartView):
                 self.last_highlighted_alm.redraw()
                 self.chart().update()
 
-
-
         super().mouseMoveEvent(event)  # call the base class method to allow zooming by rubber band
         QApplication.processEvents()
+
+    def clearAllIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
+        alm.deletePointMarkers()
+        alm.redraw()
+        self.chart().update()
 
     # create right click popup menu for vertical line marker
     def createVLMMenu(self, vlm: VerticalLineMarker):
@@ -421,7 +427,7 @@ class SmartChartView(QChartView):
         menu = QMenu(self)
         # create a show point position action
         show_point_position_action = QAction("Show Intersection Point", self)
-        show_point_position_action.triggered.connect(lambda: self.showIntersectionPoint(alm))
+        #show_point_position_action.triggered.connect(lambda: self.showIntersectionPoint(alm))
         # create a change position action
         change_position_action = QAction("Change Position", self)
         change_position_action.triggered.connect(lambda: self.changeAuxLinePosition(alm))
@@ -432,6 +438,24 @@ class SmartChartView(QChartView):
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(lambda: self.deleteAuxiliaryLineMarker(alm))
 
+        # create sub menu for show_point_position_action
+        show_point_position_menu = QMenu("Show Intersection Point", self)
+        # create actions for show_point_position_action
+        show_next_intersection_point_action = QAction("Show Next Intersection Point", self)
+        show_next_intersection_point_action.triggered.connect(lambda: self.showIntersectionPoint(alm, "next"))
+        show_all_intersection_point_action = QAction("Show All Intersection Point", self)
+        show_all_intersection_point_action.triggered.connect(lambda: self.showIntersectionPoint(alm, "all"))
+        select_intersection_point_action = QAction("Select Intersection Point", self)
+        select_intersection_point_action.triggered.connect(lambda: self.selectIntersectionPoint(alm))
+        clear_all_intersection_point_action = QAction("Clear All Intersection Point", self)
+        clear_all_intersection_point_action.triggered.connect(lambda: self.clearAllIntersectionPoint(alm))
+        # add actions to show_point_position_menu
+        show_point_position_menu.addAction(show_next_intersection_point_action)
+        show_point_position_menu.addAction(show_all_intersection_point_action)
+        show_point_position_menu.addAction(select_intersection_point_action)
+        show_point_position_menu.addAction(clear_all_intersection_point_action)
+        # add show_point_position_menu to show_point_position_action
+        show_point_position_action.setMenu(show_point_position_menu)
         # add actions to menu
         menu.addAction(show_point_position_action)
         menu.addAction(change_position_action)
@@ -589,7 +613,7 @@ class SmartChartView(QChartView):
         zoom_level_y = self.y_axis.max() / self.default_y_range[1]
         # pan the chart
         self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x)*delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
-        self.updateSubChart()
+        #self.updateSubChart()
         self.updateMarkerText()
         self.updateAuxLineMarker()
 
@@ -811,7 +835,8 @@ class SmartChartView(QChartView):
                     intersection_point.append(QPointF(alm.x_value,y))
         return intersection_point
 
-    def showIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
+    # show the next intersection point of the given auxiliary line marker
+    def showNextIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
         # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return
         # add a checkbox to ask user if he wants to show intersection point of all series
         series_list = list(self.series_dict.values())
@@ -825,15 +850,80 @@ class SmartChartView(QChartView):
         if not ok:
             return
         series = series_list[series_name_list.index(series_name)]
-        intersection_points = self.revealAuxLineIntersectionPoint(alm, series) #
+        intersection_points = self.revealAuxLineIntersectionPoint(alm, series)
+        # show the next intersection point of the given auxiliary line marker
         if intersection_points!=[]:
             # print("point marker is:",alm.point_marker)
-            alm.deletePointMarkers() # clear all previous point markers
+            alm.deletePointMarkers()
             for point in intersection_points:
                 alm.addPointMarker(PointMarker(self,point.x(),point.y()))
+
+
+    def showIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker],which_point:str="next"):
+        # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return
+        # add a checkbox to ask user if he wants to show intersection point of all series
+        series_list = list(self.series_dict.values())
+        series_list = [series for series in series_list if series.isVisible()]
+        if len(series_list) == 0:
+            # show navigation's label message to tell user that there is no series to select
+            self.navigator.showLabelMsg("No series to select")
+            return
+        series_name_list = [series.name() for series in series_list]
+        if len(series_list) > 1:
+            series_name, ok = QInputDialog.getItem(self, "Select a series", "Series:", series_name_list, 0, False)
+            if not ok:
+                return
+            series = series_list[series_name_list.index(series_name)]
+        else:
+            series = series_list[0]
+        intersection_points = self.revealAuxLineIntersectionPoint(alm, series) #
+        if intersection_points!=[]:
+            alm.deletePointMarkers() # clear all previous point markers
+            if which_point == "next":
+                if alm.intersection_series == series and alm.intersection_points == intersection_points:
+                    if len(alm.intersection_points_copy) == 0:
+                        alm.intersection_points_copy = intersection_points.copy()
+                    next_point = alm.intersection_points_copy.pop(0)
+                    alm.addPointMarker(PointMarker(self,next_point.x(),next_point.y()))
+                else:
+                    # if the intersection points are not the same as the previous one, update the intersection points and series
+                    alm.intersection_series = series
+                    alm.setIntersectionPoints(intersection_points)
+                    next_point = alm.intersection_points_copy.pop(0)
+                    alm.addPointMarker(PointMarker(self,next_point.x(),next_point.y()))
+            elif which_point == "all":
+                for point in intersection_points:
+                    alm.addPointMarker(PointMarker(self,point.x(),point.y()))
         else:
             self.navigator.showLabelMsg("No intersection point found")
-            
+
+    # pop up a diag to input the index of the intersection point to show
+    def selectIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
+        # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return
+        # add a checkbox to ask user if he wants to show intersection point of all series
+        series_list = list(self.series_dict.values())
+        series_list = [series for series in series_list if series.isVisible()]
+        if len(series_list) == 0:
+            # show navigation's label message to tell user that there is no series to select
+            self.navigator.showLabelMsg("No series to select")
+            return
+        series_name_list = [series.name() for series in series_list]
+        if len(series_list) > 1:
+            series_name, ok = QInputDialog.getItem(self, "Select a series", "Series:", series_name_list, 0, False)
+            if not ok:
+                return
+            series = series_list[series_name_list.index(series_name)]
+        else:
+            series = series_list[0]
+        intersection_points = self.revealAuxLineIntersectionPoint(alm, series)
+        if intersection_points!=[]:
+            alm.deletePointMarkers()
+            index, ok = QInputDialog.getInt(self, "Select a point", "Index:", 1, 1, len(intersection_points), 1)
+            if ok:
+                alm.addPointMarker(PointMarker(self,intersection_points[index-1].x(),intersection_points[index-1].y()))
+        else:
+            self.navigator.showLabelMsg("No intersection point found")
+           
     def _is_point_near(self, point1, point2):
         threshold_x = self.is_point_near_threshold_x 
         threshold_y = self.is_point_near_threshold_y 
@@ -877,8 +967,8 @@ class SmartLineSeries(QLineSeries):
     def addData(self,x:float,y:float):
         self.append(x,y)
         self.setName(f"My Series {self.label}")
-        if self.count()>1:
-            self.interval = self.at(self.count()-1).x()-self.at(self.count()-2).x()
+        # if self.count()>1:
+        #     self.interval = self.at(self.count()-1).x()-self.at(self.count()-2).x()
 
     # update the series with x,y data given
     def updateSeries(self,x_data:list,y_data:list):

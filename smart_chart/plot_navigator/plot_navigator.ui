@@ -212,19 +212,6 @@
      </property>
     </widget>
    </item>
-   <item>
-    <widget class="QToolButton" name="toolButton">
-     <property name="text">
-      <string/>
-     </property>
-     <property name="toolButtonStyle">
-      <enum>Qt::ToolButtonIconOnly</enum>
-     </property>
-     <property name="arrowType">
-      <enum>Qt::NoArrow</enum>
-     </property>
-    </widget>
-   </item>
   </layout>
  </widget>
  <customwidgets>

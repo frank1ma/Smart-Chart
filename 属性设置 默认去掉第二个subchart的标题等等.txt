@@ -1,0 +1,7 @@
+属性设置 默认去掉第二个subchart的标题等等
+
+meausre mode一次只能激活一次测量
+
+log plot ticks设计
+
+support scatter

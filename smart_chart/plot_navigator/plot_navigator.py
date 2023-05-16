@@ -1,7 +1,9 @@
 import pandas as pd
-from PySide6.QtWidgets import QFrame,QMenu,QGraphicsView,QFileDialog,QInputDialog,QDialog
+from PySide6.QtWidgets import QFrame,QMenu,QGraphicsView,QFileDialog,QInputDialog,QDialog,QDialogButtonBox
 from .ui_plot_navigator import Ui_plot_navigator
+from .ui_chart_options import Ui_chart_options
 from .series_editor import SeriesEditor
+from .measure import PointMarker
 from PySide6.QtCharts import QChartView,QLineSeries
 from PySide6.QtCore import Qt,QTimer, QPointF, QSize, QRectF
 from PySide6.QtGui import QAction,QPixmap, QPainter, QPdfWriter,QPageSize,QShortcut,QKeySequence
@@ -17,6 +19,7 @@ class PlotNavigator(QFrame):
         self._initSignalSlot()
         self._initPopMenu()
         self.main_chart_view = main_chart_view
+        self.chart_options = {}
         
     # init signal and slot
     def _initSignalSlot(self):
@@ -35,7 +38,7 @@ class PlotNavigator(QFrame):
         self.ui.series_editor_button.clicked.connect(self.showSeriesEditor)
 
         #click the setting_button to set the chart title
-        self.ui.setting_button.clicked.connect(self.removeSeries)
+        self.ui.setting_button.clicked.connect(self.showOptionsDialog)
 
         #click the measure_button to measure the distance between two points
         self.ui.measure_button.setCheckable(True)
@@ -156,6 +159,43 @@ class PlotNavigator(QFrame):
         if self.series_editor.exec() == QDialog.Accepted:
             self.main_chart_view.updateSeriesVisibility(self.series_editor.get_series_to_show())
     
+    #show the setting dialog to allow user to set the chart title
+    def showOptionsDialog(self):
+        # create a setting dialog as QDialog
+        self.options_dialog = QDialog(self)
+        # create a ui for the setting dialog
+        self.options_dialog.ui = Ui_chart_options()
+        # setup the ui for the setting dialog
+        self.options_dialog.ui.setupUi(self.options_dialog)
+        # register the standard buttons
+        self.options_dialog.ui.buttonBox.setStandardButtons(QDialogButtonBox.Ok | QDialogButtonBox.Apply | QDialogButtonBox.Cancel)
+        # connect the buttons to the slots
+        self.options_dialog.ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.options_dialog.accept)
+        self.options_dialog.ui.buttonBox.button(QDialogButtonBox.Apply).clicked.connect(self.applyChartOptions)
+        self.options_dialog.ui.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.options_dialog.reject)
+        self.options_dialog.ui.horizontalScrollBar_x.valueChanged.connect(lambda: self.options_dialog.ui.label_pan_x.setText(f"Pan X Sensitivity: {str(self.options_dialog.ui.horizontalScrollBar_x.value())}"))
+        self.options_dialog.ui.horizontalScrollBar_y.valueChanged.connect(lambda: self.options_dialog.ui.label_pan_y.setText(f"Pan Y Sensitivity: {str(self.options_dialog.ui.horizontalScrollBar_y.value())}"))
+        
+        # self.options_dialog.ui.button_ok.clicked.connect(self.options_dialog.accept)
+        # self.options_dialog.ui.button_apply.clicked.connect(self.applyChartOptions)
+        # self.options_dialog.ui.button_cancel.clicked.connect(self.options_dialog.reject)
+
+        # load the chart information to the setting dialog
+        self.updateOptionsDict()
+        self.updateChartOptionsForm(self.options_dialog)
+        val = self.options_dialog.exec()
+        if  val == QDialog.Accepted:
+            if self.applyChartOptions():
+            # update the msg_label "Chart Title Updated" and clear it after 3 seconds
+                self.showLabelMsg("Chart Options Updated")
+            else:
+                #self.showLabelMsg("Chart Options Update Failed")
+                pass
+        else:
+            print("Cancel")
+
+
+
     # reset the chart
     def resetChart(self):
         # reset the plot area
@@ -165,9 +205,8 @@ class PlotNavigator(QFrame):
         self.main_chart_view.chart().axisY().setRange(self.main_chart_view.default_y_range[0], self.main_chart_view.default_y_range[1])
         
         if self.main_chart_view.sub_chart!=None:
-            self.main_chart_view.sub_chart.navigator.resetChart()
-            self.main_chart_view.updateSubChart()
-
+            #self.main_chart_view.updateSubChart()
+            pass
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
     
@@ -273,7 +312,7 @@ class PlotNavigator(QFrame):
         self.resetChart()
         if self.main_chart_view.sub_chart!=None:
             self.main_chart_view.sub_chart.navigator.restoreOriginView()
-            self.main_chart_view.updateSubChart()
+            #self.main_chart_view.updateSubChart()
         if self.ui.vertical_marker_button.isChecked():
             self._setAllVerticalLineMarkerLastXPos()
         # update the msg_label "Orignal View restored" and clear it after 3 seconds
@@ -316,6 +355,68 @@ class PlotNavigator(QFrame):
                                               self.main_chart_view.chart().axisX().min()*1.5,decimals=4)
             if ok:
                 self.main_chart_view.addAuxiliaryLineMarker(line_type,pos)
+    
+    # apply the chart setting
+    def applyChartOptions(self):
+        # load the content of the dialog to the dictionary self.chart_options
+        try:
+            self.chart_options["chart_title"] = self.options_dialog.ui.lineEdit_title.text()
+            self.chart_options["x_axis_min"] = float(self.options_dialog.ui.lineEdit_x_min.text())
+            self.chart_options["x_axis_max"] = float(self.options_dialog.ui.lineEdit_x_max.text())
+            self.chart_options["y_axis_min"] = float(self.options_dialog.ui.lineEdit_y_min.text())
+            self.chart_options["y_axis_max"] = float(self.options_dialog.ui.lineEdit_y_max.text())
+            self.chart_options["x_axis_label"] = self.options_dialog.ui.lineEdit_x_label.text()
+            self.chart_options["y_axis_label"] = self.options_dialog.ui.lineEdit_y_label.text()
+            # load the pan sensitivity to the dictionary self.chart_options
+            self.chart_options["pan_sensitivity_x"] = self.options_dialog.ui.horizontalScrollBar_x.value()/20.0
+            self.chart_options["pan_sensitivity_y"] = self.options_dialog.ui.horizontalScrollBar_y.value()/20.0
+            # load the subchart_sync_x_axis
+            self.chart_options["subchart_sync_x_axis"] = self.options_dialog.ui.checkBox_subchart_sync_x_axis.isChecked()
+            # load the subchart_sync_y_axis
+            self.chart_options["subchart_sync_y_axis"] = self.options_dialog.ui.checkBox_subchart_sync_y_axis.isChecked()
+            # load the marker size
+            self.chart_options["point_marker_size"] = self.options_dialog.ui.spinBox_point_maker_size.value()
+
+        except ValueError:
+            self.showLabelMsg("Invalid Input", 3000)
+            return False
+        except Exception as e:
+            self.showLabelMsg(str(e), 3000)
+            return False
+        
+        if self.chart_options["x_axis_min"] >= self.chart_options["x_axis_max"]:
+            self.showLabelMsg("Error! xMin >= xMax", 3000)
+            return False
+        if self.chart_options["y_axis_min"] >= self.chart_options["y_axis_max"]:
+            self.showLabelMsg("Error! yMin >= yMax", 3000)
+            return False
+        try:
+            # set the chart title
+            self.main_chart_view.chart().setTitle(self.chart_options["chart_title"])
+            # set the x axis range
+            self.main_chart_view.chart().axisX().setRange(self.chart_options["x_axis_min"], self.chart_options["x_axis_max"])
+            # set the y axis range
+            self.main_chart_view.chart().axisY().setRange(self.chart_options["y_axis_min"], self.chart_options["y_axis_max"])
+            # set the x axis label
+            self.main_chart_view.chart().axisX().setTitleText(self.chart_options["x_axis_label"])
+            # set the y axis label
+            self.main_chart_view.chart().axisY().setTitleText(self.chart_options["y_axis_label"])
+            # set the pan sensitivity
+            self.main_chart_view.pan_x_sensitivity = self.chart_options["pan_sensitivity_x"]
+            self.main_chart_view.pan_y_sensitivity = self.chart_options["pan_sensitivity_y"]
+            # set the subchart_sync_x_axis
+            self.main_chart_view.subchart_sync_x_axis = self.chart_options["subchart_sync_x_axis"]
+            # set the subchart_sync_y_axis
+            self.main_chart_view.subchart_sync_y_axis = self.chart_options["subchart_sync_y_axis"]
+            # set the point marker size
+            PointMarker.marker_size = self.chart_options["point_marker_size"]
+        except Exception as e:
+            self.showLabelMsg(e, 3000)
+            return False
+        # update the chart
+        self.main_chart_view.chart().update()
+
+
         
     def deleteAllAuxiliaryLineMarkers(self):
         self.main_chart_view.deleteAllAuxiliaryLineMarkers()
@@ -337,6 +438,59 @@ class PlotNavigator(QFrame):
             self.showLabelMsg("Series Removed")
         else:
             pass
+
+    
+    def updateOptionsDict(self):
+        # load the chart title to the dictionary self.chart_options
+        self.chart_options["chart_title"] = self.main_chart_view.chart().title()
+        # load the x axis min and max to the dictionary self.chart_options
+        self.chart_options["x_axis_min"] = self.main_chart_view.chart().axisX().min()
+        self.chart_options["x_axis_max"] = self.main_chart_view.chart().axisX().max()
+        # load the y axis min and max to the dictionary self.chart_options
+        self.chart_options["y_axis_min"] = self.main_chart_view.chart().axisY().min()
+        self.chart_options["y_axis_max"] = self.main_chart_view.chart().axisY().max()
+        # load the x axis label to the dictionary self.chart_options
+        self.chart_options["x_axis_label"] = self.main_chart_view.chart().axisX().titleText()
+        # load the y axis label to the dictionary self.chart_options
+        self.chart_options["y_axis_label"] = self.main_chart_view.chart().axisY().titleText()
+
+        # load the pan sensitivity to the dictionary self.chart_options
+        self.chart_options["pan_sensitivity_x"] = int(self.main_chart_view.pan_x_sensitivity*20)
+        self.chart_options["pan_sensitivity_y"] = int(self.main_chart_view.pan_y_sensitivity*20)
+
+        # load the subchart_sync_x_axis
+        self.chart_options["subchart_sync_x_axis"] = self.main_chart_view.subchart_sync_x_axis
+        
+        # load the subchart_sync_y_axis
+        self.chart_options["subchart_sync_y_axis"] = self.main_chart_view.subchart_sync_y_axis
+
+        # load the point marker size
+        self.chart_options["point_marker_size"] = PointMarker.marker_size
+
+    # update the self.options_dialog with the content in self.chart_options
+    def updateChartOptionsForm(self,diag:QDialog):
+        diag.ui.lineEdit_title.setText(self.chart_options["chart_title"])
+        diag.ui.lineEdit_x_min.setText(str(self.chart_options["x_axis_min"]))
+        diag.ui.lineEdit_x_max.setText(str(self.chart_options["x_axis_max"]))
+        diag.ui.lineEdit_y_min.setText(str(self.chart_options["y_axis_min"]))
+        diag.ui.lineEdit_y_max.setText(str(self.chart_options["y_axis_max"]))
+        diag.ui.lineEdit_x_label.setText(self.chart_options["x_axis_label"])
+        diag.ui.lineEdit_y_label.setText(self.chart_options["y_axis_label"])
+        # update the slider value acccording to the pan sensitivity
+        diag.ui.horizontalScrollBar_x.setValue(self.chart_options["pan_sensitivity_x"])
+        diag.ui.horizontalScrollBar_y.setValue(self.chart_options["pan_sensitivity_y"])
+        diag.ui.label_pan_x.setText(f"Pan X Sensitivity: {self.chart_options['pan_sensitivity_x']}")
+        diag.ui.label_pan_y.setText(f"Pan Y Sensitivity: {self.chart_options['pan_sensitivity_y']}")
+        diag.ui.spinBox_point_maker_size.setValue(self.chart_options["point_marker_size"])
+        if self.chart_options["subchart_sync_x_axis"] == True:
+            diag.ui.checkBox_subchart_sync_x_axis.setChecked(True)
+        else:
+            diag.ui.checkBox_subchart_sync_x_axis.setChecked(False)
+        if self.chart_options["subchart_sync_y_axis"] == True:
+            diag.ui.checkBox_subchart_sync_y_axis.setChecked(True)
+        else:
+            diag.ui.checkBox_subchart_sync_y_axis.setChecked(False)
+        
 
     def _limitRangeToSeries(self):
         # limit the range of the vertical line marker to the range of series

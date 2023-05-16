@@ -149,7 +149,7 @@ class MeasureMarker(QLineSeries):
             # add text item above the marker
             self.text_item = QGraphicsTextItem()
             # set the position of the text item to the middle of the measure line
-            viewport_pos = self._convertPointFromChartViewtoViewPort(QPointF(self.measure_line.center().x(), self.measure_line.p2().y()))
+            viewport_pos = self._convertPointFromChartViewtoViewPort(QPointF(self.measure_line.center().x(), self.measure_line.center().y()))
             self.text_item.setPos(viewport_pos)
             self.text_item.setPlainText(f"Vertical Dis:{self.measure.calculateVerticalDistance():.3f}")
             self.chart_view.scene().addItem(self.text_item)
@@ -175,9 +175,9 @@ class MeasureMarker(QLineSeries):
             # add text item above the marker
             self.text_item = QGraphicsTextItem()
             # set the position of the text item to the middle of the measure line
-            viewport_pos = self._convertPointFromChartViewtoViewPort(QPointF(self.measure_line.p2().x(), self.measure_line.center().y()))
-            self.text_item.setPos(viewport_pos)
+            viewport_pos = self._convertPointFromChartViewtoViewPort(QPointF(self.measure_line.center().x(), self.measure_line.center().y()))
             self.text_item.setPlainText(f"Horizontal Dis:{self.measure.calculateHorizontalDistance():.3f}")
+            self.text_item.setPos(viewport_pos)
             self.chart_view.scene().addItem(self.text_item)
 
     # drawPointToPointMeasureLine is similar to drawVerticalMeasureLine
@@ -196,8 +196,8 @@ class MeasureMarker(QLineSeries):
             self.text_item = QGraphicsTextItem()
             # set the position of the text item to the middle of the measure line
             viewport_pos = self._convertPointFromChartViewtoViewPort(QPointF(self.measure_line.center().x(), self.measure_line.center().y()))
-            self.text_item.setPos(viewport_pos)
             self.text_item.setPlainText(f"Point to Point Dis:{self.measure.calculateDistance():.3f}")
+            self.text_item.setPos(viewport_pos)
             self.chart_view.scene().addItem(self.text_item)
 
     def changeType(self, type):
@@ -262,6 +262,9 @@ class HorizontalAuxLineMarker(QLineSeries):
         pen.setDashPattern([1,4])
         self.setPen(pen)
         self.pen_backup = pen
+        self.intersection_points_copy = []
+        self.intersection_points = []
+        self.intersection_series = None
         # add the horizontal line with y_value across the current x range of chart
         if self.x1_value != None and self.x2_value != None:
             self.append(QPointF(self.x1_value, self.y_value))
@@ -285,6 +288,14 @@ class HorizontalAuxLineMarker(QLineSeries):
     
     def addPointMarker(self,point_marker:PointMarker):
         self.point_marker[point_marker.id] = point_marker
+        return True
+    
+    def setIntersectionPoints(self,points:list):
+        # set the intersection points of the horizontal line and the vertical line
+        # the intersection points are the points that are on the horizontal line
+        # and are closest to the vertical line
+        self.intersection_points = points
+        self.intersection_points_copy = points.copy()
         return True
 
     def _deletePointMarker(self,point_marker:PointMarker):
@@ -365,6 +376,9 @@ class VerticalAuxLineMarker(QLineSeries):
         pen.setDashPattern([1,4])
         self.setPen(pen)
         self.pen_backup = pen
+        self.intersection_points_copy = []
+        self.intersection_points = []
+        self.intersection_series = None
         # add the vertical line with x_value across the current y range of chart
         if self.y_value!=None:
             self.append(QPointF(self.x_value, self.y_value*1.2))
@@ -389,7 +403,15 @@ class VerticalAuxLineMarker(QLineSeries):
     def addPointMarker(self,point_marker:PointMarker):
         self.point_marker[point_marker.id] = point_marker
         return True
-
+    
+    def setIntersectionPoints(self,points:list):
+        # set the intersection points of the horizontal line and the vertical line
+        # the intersection points are the points that are on the horizontal line
+        # and are closest to the vertical line
+        self.intersection_points = points
+        self.intersection_points_copy = points.copy()
+        return True
+    
     def _deletePointMarker(self,point_marker:PointMarker):
         if point_marker.id in self.point_marker:
             del self.point_marker[point_marker.id]
@@ -444,6 +466,7 @@ class VerticalAuxLineMarker(QLineSeries):
 class PointMarker(QScatterSeries):
     isinstance_count = 0
     id_pool = set()
+    marker_size = 10
     def __init__(self, chart_view:QChartView, x_value:float, y_value:float):
         super().__init__()
         self.chart_view = chart_view
@@ -452,7 +475,7 @@ class PointMarker(QScatterSeries):
         self.y_value = y_value
         self.setupID()
         self.setName(f"PointMarker_{self.id}")
-        self.setMarkerSize(10)
+        self.setMarkerSize(PointMarker.marker_size)
         self.setMarkerShape(QScatterSeries.MarkerShape.MarkerShapeCircle)
         self.setBrush(QBrush(Qt.red))
         self.append(QPointF(self.x_value, self.y_value))

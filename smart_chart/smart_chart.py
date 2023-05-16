@@ -7,7 +7,8 @@ from PySide6.QtGui import QAction
 #import plot_navigator
 from plot_navigator.plot_navigator import PlotNavigator
 from smart_chart_view import SmartChartView
-
+import control
+import numpy as np
 #add plot_navigator/icon/plot_navigator_rc.py into python path
 
 # create smart chart class as QFrame
@@ -26,29 +27,31 @@ class SmartChart(QFrame):
         self.nav_bar = PlotNavigator(self.chart_view)
 
         # create a new chart
-        self.chart2 = QChart()
-        self.chart2.setTitle("My Chart2")
+        #self.chart2 = QChart()
+        #self.chart2.setTitle("My Chart2")
         # add another chart view to the smart chart
-        self.chart_view2 = SmartChartView(self.chart2,self)
+        #self.chart_view2 = SmartChartView(self.chart2,self)
         # add navigation bar to the smart chart
-        self.nav_bar2 = PlotNavigator(self.chart_view2)
-        self.nav_bar2.setVisible(False)
+        #self.nav_bar2 = PlotNavigator(self.chart_view2)
+        #self.nav_bar2.setVisible(False)
 
         # add the chart view and navigation bar to the smart chart
         self.chart_view.setupNavigator(self.nav_bar)
-        self.chart_view2.setupNavigator(self.nav_bar2)
+        #self.chart_view2.setupNavigator(self.nav_bar2)
 
         # add subchart to the smart chart
-        self.chart_view.setSubChat(self.chart_view2)
-        self.chart_view2.setVisible(False)
+        #self.chart_view.setSubChat(self.chart_view2)
+        #self.chart_view2.setSubChat(self.chart_view)
+
+        #self.chart_view.plotXY([1,2,3],[1,2,3])
     # setup the layout of the smart chart   
         layout.addWidget(self.nav_bar,0,0,1,2)
         # add hide button to the layout
         layout.addWidget(self.chart_view,1,0,1,3)
 
-        layout.addWidget(self.nav_bar2,2,0,1,2)
+        #layout.addWidget(self.nav_bar2,2,0,1,2)
         # add hide button to the layout
-        layout.addWidget(self.chart_view2,3,0,1,3)
+        #layout.addWidget(self.chart_view2,3,0,1,3)
 
         self.setLayout(layout)
 
@@ -83,16 +86,20 @@ class SmartChart(QFrame):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
         # Add the custom frame to the main window
         custom_frame = SmartChart()
         self.setCentralWidget(custom_frame)
 
 if __name__ == "__main__":
     app = QApplication([])
-
     window = MainWindow()
     window.setGeometry(800, 400, 800, 600)
     window.show()
+    
+    sys1 = control.tf([1], [1,2,1])
+    mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,1000),omega_num=500,plot=False)
 
+    widget:SmartChart = window.centralWidget()
+    widget.chart_view.plotXY(omega,20*np.log10(mag),series=widget.chart_view.chart().series()[0])
+    #widget.chart_view2.plotXY(omega,phase,series=widget.chart_view.chart().series()[0])
     app.exec()
