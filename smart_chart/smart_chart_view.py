@@ -34,7 +34,7 @@ class SmartChartView(QChartView):
         self.aux_line_dict = {}
 
         self.active_measure_marker = None
-        self.current_measure_type = "horizontal"
+        self.current_measure_type = "p2p"
 
     # initialize the chart
     def initChart(self):
@@ -174,7 +174,7 @@ class SmartChartView(QChartView):
             marker.setVisible(True)
             self.measure_marker_dict[marker.id]=marker
             self.active_measure_marker = None
-            self.current_measure_type = "horizontal"
+            self.current_measure_type = "p2p"
     
     # update the visibility of all the series with given id in self.series_dict
     # if id is in the list, set visibility to True, else set visibility to False
