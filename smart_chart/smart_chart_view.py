@@ -4,7 +4,7 @@ from plot_navigator.plot_navigator import PlotNavigator
 from plot_navigator.measure import Measure,MeasureMarker,PointMarker,VerticalAuxLineMarker,HorizontalAuxLineMarker
 from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries,QScatterSeries,QLogValueAxis,QAbstractAxis
 from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor
-from PySide6.QtCore import Qt,QEvent,QPointF
+from PySide6.QtCore import Qt,QEvent,QPointF,QEventLoop,QTimer
 from PySide6.QtWidgets import QGraphicsEllipseItem,QGraphicsTextItem,QApplication,QMenu,QColorDialog,QInputDialog
 import math
 import sys
@@ -89,6 +89,10 @@ class SmartChartView(QChartView):
     # init options of charts
     def initOptions(self):
         self.sub_chart = None
+        self.measure_marker_order = []
+        self.new_measure_request = False
+        self.moving_mm:MeasureMarker = None
+        self.moving_measure_marker_text_flag = False
         self.markerLimitRangeToSeries = False
         self.vlm_selected = None
         self.point_marker = None 
@@ -173,8 +177,10 @@ class SmartChartView(QChartView):
             self.addSeriestoXY(marker, self.x_axis, self.y_axis)
             marker.setVisible(True)
             self.measure_marker_dict[marker.id]=marker
+            self.measure_marker_order.append(marker.id)
             self.active_measure_marker = None
             self.current_measure_type = "p2p"
+            self.new_measure_request = False
     
     # update the visibility of all the series with given id in self.series_dict
     # if id is in the list, set visibility to True, else set visibility to False
@@ -248,8 +254,13 @@ class SmartChartView(QChartView):
 
         # if left click on the measure button, create a new measure marker
         elif event.button() == Qt.LeftButton and self.navigator.ui.measure_button.isChecked():
-            self.addMeasureMarker(event)
-            self.updateMarkerText()
+            if self.moving_mm!=None:
+                self.moving_mm = None
+                self.moving_measure_marker_text_flag = False
+            else:
+                if len(self.measure_marker_dict)<1 or self.new_measure_request == True:
+                    self.addMeasureMarker(event)
+                    self.updateMarkerText()
 
         #if right click on the vertical line marker, popups a menu
         elif event.button() == Qt.RightButton and self.navigator.ui.vertical_marker_button.isChecked():
@@ -264,11 +275,13 @@ class SmartChartView(QChartView):
             chosen_measure_marker = self.findNearestMeasureMarker(chart_point)
             if chosen_measure_marker!=None:
                 self.createMeasureMenu(chosen_measure_marker)
+            # if right click on the blank area and there is a measure marker whose fisrt point is selected, delete the measure marker
             if self.active_measure_marker!=None and not self.active_measure_marker.checkCompleteStatus():
                 self.active_measure_marker.clearPoint()
                 self.active_measure_marker = None
                 self.current_measure_type = "horizontal"
                 self.point_selected = None
+                self.new_measure_request = False
 
         # right click on the blank area and show the add auxiliary line menu
         if event.button() == Qt.RightButton and self.navigator.isVisible():
@@ -360,6 +373,14 @@ class SmartChartView(QChartView):
                 self.last_highlighted_alm.redraw()
                 self.chart().update()
 
+        if self.measure_marker_dict != {} and self.moving_measure_marker_text_flag == True:
+            chart_point = self.chart().mapToValue(event.position())
+            if self.moving_mm!=None:
+                pos = self.moving_mm._convertPointFromChartViewtoViewPort(chart_point)
+                self.moving_mm.text_item.setPos(pos)
+                self.chart().update()
+                QApplication.processEvents()
+
         super().mouseMoveEvent(event)  # call the base class method to allow zooming by rubber band
         QApplication.processEvents()
 
@@ -401,6 +422,9 @@ class SmartChartView(QChartView):
         change_type_action = QAction("Change Measure Type", self)
         # create submenu for measure type: Horizontal,Vertical,Point-to-Point
         measure_type_menu = QMenu("Measure Type", self)
+        # create menu action to text position of measure marker's item text
+        text_position_action = QAction("Change Measure Text Position", self)
+        text_position_action.triggered.connect(lambda: self.changeMeasureTextPosition(mm))
         # create actions for measure type
         horizontal_action = QAction("Horizontal", self)
         horizontal_action.triggered.connect(lambda: self.changeMeasureType(mm, "horizontal"))
@@ -423,6 +447,7 @@ class SmartChartView(QChartView):
         
         # add actions to menu
         menu.addAction(change_type_action)
+        menu.addAction(text_position_action)
         menu.addAction(change_color_action)
         menu.addAction(delete_action)
         # show menu
@@ -583,7 +608,16 @@ class SmartChartView(QChartView):
                 if al.points()[0].y() == 0:
                     al_min_dis = abs(al.points()[0].y() - point.y())
                 else:
-                    al_min_dis = abs(al.points()[0].y() - point.y())/abs(al.points()[0].y())
+                    #al_min_dis = abs(al.points()[0].y() - point.y())/abs(al.points()[0].y())4
+                    if self.y_axis.type() == QAbstractAxis.AxisType.AxisTypeValue and self.plot_type == "bode_mag":
+                        al_min_dis = 20*np.log(abs(al.points()[0].y() - point.y()))/abs(self.y_axis.max() - self.y_axis.min())
+                    elif self.y_axis.type() == QAbstractAxis.AxisType.AxisTypeValue and self.plot_type == "bode_phase":
+                        al_min_dis = abs(al.points()[0].y() - point.y())/abs(self.y_axis.max() - self.y_axis.min())
+                    elif self.y_axis.type() == QAbstractAxis.AxisType.AxisTypeLogValue:
+                        al_min_dis = np.log(abs(al.points()[0].y() - point.y()))/abs(np.log(self.y_axis.max() / self.y_axis.min()))
+                    else:
+                        al_min_dis = abs(al.points()[0].y() - point.y())/abs(self.y_axis.max() - self.y_axis.min())
+                 
                 if min_dis > al_min_dis:
                     min_dis = al_min_dis
                     nearst_al = al
@@ -591,18 +625,23 @@ class SmartChartView(QChartView):
                 if al.points()[0].x() == 0:
                     al_min_dis = abs(al.points()[0].x() - point.x())
                 else:
-                    al_min_dis = abs(al.points()[0].x() - point.x())/abs(al.points()[0].x())
+                    #al_min_dis = abs(al.points()[0].x() - point.x())/abs(al.points()[0].x())
+                    if self.x_axis.type() == QAbstractAxis.AxisType.AxisTypeValue:
+                        al_min_dis = abs(al.points()[0].x() - point.x())/abs(self.x_axis.max() - self.x_axis.min())
+                    elif self.x_axis.type() == QAbstractAxis.AxisType.AxisTypeLogValue:
+                        al_min_dis = np.log(abs(al.points()[0].x() - point.x()))/np.log(self.x_axis.max() / self.x_axis.min())
                 if min_dis > al_min_dis:
                     min_dis = al_min_dis
                     nearst_al = al
 
-        if nearst_al == None: return None
-        if nearst_al.__class__.__name__ == "HorizontalAuxLineMarker" and nearst_al.aux_line_mode!="measure" and  al.points()[0].y() == 0:
-            threshold = 0.05 * (self.y_axis.max() - self.y_axis.min())
-        elif nearst_al.__class__.__name__ == "VerticalAuxLineMarker" and nearst_al.aux_line_mode!="measure" and al.points()[0].x() == 0:
-            threshold = 0.05 * (self.x_axis.max() - self.x_axis.min())
+        if nearst_al == None: 
+            return None
+        if nearst_al.__class__.__name__ == "HorizontalAuxLineMarker" and nearst_al.aux_line_mode!="measure" and  nearst_al.points()[0].y() == 0:
+            threshold = 0.08 * (self.y_axis.max() - self.y_axis.min())
+        elif nearst_al.__class__.__name__ == "VerticalAuxLineMarker" and nearst_al.aux_line_mode!="measure" and nearst_al.points()[0].x() == 0:
+            threshold = 0.08 * (self.x_axis.max() - self.x_axis.min())
         else:
-            threshold = 0.05
+            threshold = 0.08
         #print("threshold:",threshold,"min_dis:",min_dis,"nearst_al:",nearst_al)
         if min_dis <= threshold:  # self.auxiliaryLinethreshold:   
             return nearst_al
@@ -638,8 +677,7 @@ class SmartChartView(QChartView):
                                                                             mm.point2_marker.y_value))
             mm.text_item.setPos(viewport_text_pos)
             mm.point1_marker.point_coordinate_label.setPos(viewport_point1_pos)
-            mm.point2_marker.point_coordinate_label.setPos(viewport_point2_pos)
-        
+            mm.point2_marker.point_coordinate_label.setPos(viewport_point2_pos)     
 
         # pan all the point coordinate label together with the auxiliary line marker
         for alm in self.aux_line_dict.values():  
@@ -677,6 +715,8 @@ class SmartChartView(QChartView):
         mm.clearMeasureLine()
         # remove the given measure marker from the measure_marker_dict
         del self.measure_marker_dict[mm.id]
+        # pop the id in the measure_marker_order list
+        self.measure_marker_order.remove(mm.id)
         # dremove the id of the given measure marker from the id_pool
         MeasureMarker.id_pool.remove(mm.id)
         MeasureMarker.isinstance_count -= 1
@@ -712,6 +752,16 @@ class SmartChartView(QChartView):
         self.aux_line_dict.clear()
         self.chart().update()
 
+    def deleteLastMeasure(self):
+        if self.measure_marker_dict!={} and self.measure_marker_order!=[]:
+            self.deleteMeasureMarker(self.measure_marker_dict[self.measure_marker_order[-1]])
+            return True
+        return False
+    
+    def deleteAllMeasure(self):
+        while len(self.measure_marker_dict)>0:
+            self.deleteLastMeasure()
+
     # change the color of the given measure marker
     def changeMeasureColor(self, mm: MeasureMarker):
         # open a color dialog
@@ -722,6 +772,15 @@ class SmartChartView(QChartView):
             for aux_line in [mm.halm1,mm.halm2,mm.valm1,mm.valm2]:  # set Auxiliary Line Marker color
                 if aux_line != None:
                     aux_line.setColor(color)
+
+    # change the mesuare marker's item text's position by cursor position
+    def changeMeasureTextPosition(self,mm:MeasureMarker):
+        self.moving_mm = mm
+        self.moving_measure_marker_text_flag = True
+       
+
+
+
     # change the color of the given vertical line marker
     def changeVLMColor(self, vlm: VerticalLineMarker):
         # open a color dialog
@@ -774,7 +833,6 @@ class SmartChartView(QChartView):
         if ok:
             alm.setPosition(new_pos)
             alm.deletePointMarkers()
-        
 
     # update the position of all vertical line marker in self.vertical_marker_dict
     def updateAllVLM(self):
@@ -919,6 +977,13 @@ class SmartChartView(QChartView):
             self.y_axis.setTickInterval(10)
         #series.updateProperty() # add interpolated version of series if necessary
 
+    # set the chart title and subchart title as optional
+    def setChartTitle(self, title:str, subchart_title:str=""):
+        if self.chart()!=None:
+            self.chart().setTitle(title)
+            if self.sub_chart!=None:
+                self.sub_chart.chart().setTitle(subchart_title)
+
     def changeAxesType(self,new_x_axis_type,new_y_axis_type):
         if new_x_axis_type == "log":
             new_x_axis_type = QAbstractAxis.AxisType.AxisTypeLogValue
@@ -955,7 +1020,6 @@ class SmartChartView(QChartView):
             change_X = True
 
         if new_y_axis_type != self.y_axis.type():
-            print(new_y_axis_type,self.y_axis.type())
             if new_y_axis_type == QAbstractAxis.AxisType.AxisTypeLogValue:
                 self.y_axis = QLogValueAxis()
                 self.y_axis.setBase(10)
@@ -1010,7 +1074,6 @@ class SmartChartView(QChartView):
         intersection_points = self.revealAuxLineIntersectionPoint(alm, series)
         # show the next intersection point of the given auxiliary line marker
         if intersection_points!=[]:
-            # print("point marker is:",alm.point_marker)
             alm.deletePointMarkers()
             for point in intersection_points:
                 alm.addPointMarker(PointMarker(self,point.x(),point.y()))

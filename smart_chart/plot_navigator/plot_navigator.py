@@ -14,12 +14,14 @@ class PlotNavigator(QFrame):
     #init the class with Ui_plot_navigator
     def __init__(self, main_chart_view:QChartView, parent = None):
         super().__init__(parent)
+        self.main_chart_view = main_chart_view
+        self.chart_options = {}
         self.ui = Ui_plot_navigator()
         self.ui.setupUi(self)
         self._initSignalSlot()
         self._initPopMenu()
-        self.main_chart_view = main_chart_view
-        self.chart_options = {}
+
+       
         
     # init signal and slot
     def _initSignalSlot(self):
@@ -99,11 +101,17 @@ class PlotNavigator(QFrame):
         add_vm_action = QAction("Add Vertical Measure",self)
         add_hm_action = QAction("Add Horizontal Measure",self)
         add_p2p_action = QAction("Add Point-to-Point", self)
+        # add actions to delete last measure
+        delete_last_mm_action = QAction("Delete Last Measure",self)
+        delete_all_mm_action = QAction("Delete All Measure",self)
 
         # create a action for the pop menu
         self.measure_pop_menu.addAction(add_vm_action)
         self.measure_pop_menu.addAction(add_hm_action)
         self.measure_pop_menu.addAction(add_p2p_action)
+        self.measure_pop_menu.addSeparator()
+        self.measure_pop_menu.addAction(delete_last_mm_action)
+        self.measure_pop_menu.addAction(delete_all_mm_action)
         # set the pop menu to the measure button
         self.ui.measure_button.setMenu(self.measure_pop_menu)
 
@@ -111,6 +119,8 @@ class PlotNavigator(QFrame):
         add_vm_action.triggered.connect(lambda: self.selectMeasure("vertical"))
         add_hm_action.triggered.connect(lambda: self.selectMeasure("horizontal"))
         add_p2p_action.triggered.connect(lambda: self.selectMeasure("p2p"))
+        delete_last_mm_action.triggered.connect(self.main_chart_view.deleteLastMeasure)
+        delete_all_mm_action.triggered.connect(self.main_chart_view.deleteAllMeasure)
 
     #init popmenu of the original view button
     def _initOriginViewButtonPopMenu(self):
@@ -271,12 +281,18 @@ class PlotNavigator(QFrame):
         if self.ui.measure_button.isChecked():
             self.main_chart_view.setRubberBand(QChartView.NoRubberBand)
             self.main_chart_view.setDragMode(QGraphicsView.DragMode.NoDrag)
+            self.main_chart_view.new_measure_request = True
+            # show label msg that measure mode is enabled
+            self.showLabelMsg("Measure Mode On")
             if self.ui.zoom_button.isChecked():
                 self.ui.zoom_button.setChecked(False)
             elif self.ui.pan_view_button.isChecked():
                 self.ui.pan_view_button.setChecked(False)
         else:
             self.main_chart_view.setDragMode(QGraphicsView.DragMode.NoDrag)
+            self.main_chart_view.new_measure_request = False
+            # show label msg that measure mode is disabled
+            self.showLabelMsg("Measure Mode Off")
             if self.main_chart_view.point_marker!=None:
                 self.main_chart_view.point_marker.setVisible(False)
     

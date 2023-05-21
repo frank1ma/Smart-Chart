@@ -1,11 +1,13 @@
-属性设置 默认去掉第二个subchart的标题等等
+issue:
 
-meausre mode一次只能激活一次测量
+√ 属性设置 默认去掉第二个subchart的标题等等
 
-log plot ticks设计 基本完成 
+√ meausre mod delete last measure / all measure
+
+√ log plot ticks设计 基本完成 
 
 support scatter
 
-measure mark text的位置并不好
+√ measure mark text的位置并不好： 目前可调整
 
-两条辅助线 交叉 有一条无法选中  在maximize window的时候
+√ 两条辅助线 交叉 有一条无法选中 : 已基本解决 在maximize window的时候: 与轴的scale有关。
