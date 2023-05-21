@@ -6,7 +6,7 @@ issue:
 
 √ log plot ticks设计 基本完成 
 
-support scatter
+√ support scatter
 
 √ measure mark text的位置并不好： 目前可调整
 

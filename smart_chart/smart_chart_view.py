@@ -121,16 +121,19 @@ class SmartChartView(QChartView):
         if not legend_visible:
             self.chart().legend().markers(series)[0].setVisible(False)
 
-    def plotXY(self,x,y,series:SmartLineSeries= None):
+    def plotXY(self,x,y,series_type="line",series:SmartLineSeries= None):
         self.setAxesProperty(x, y)
         if series == None:
-            series = self.addNewSeries()
+            series = self.addNewSeries(series_type)
         self.updateSeries(series,x,y)
         self.updateDefaultRange()
 
-    def addNewSeries(self):
+    def addNewSeries(self,series_type:str):
         # create a new series
-        new_series = SmartLineSeries(self,f"Series {len(self.series_dict)}")
+        if series_type == "line":
+            new_series = SmartLineSeries(self,f"Series {len(self.series_dict)}")
+        elif series_type == "scatter":
+            new_series = SmartScatterSeries(self,f"Series {len(self.series_dict)}")
         # add series to self.series_dict
         self.series_dict[new_series.id] = new_series
         # add series to chart
@@ -982,7 +985,7 @@ class SmartChartView(QChartView):
         if self.chart()!=None:
             self.chart().setTitle(title)
             if self.sub_chart!=None:
-                self.sub_chart.chart().setTitle(subchart_title)
+                self.sub_chart.chart().setTitle(subchart_title) 
 
     def changeAxesType(self,new_x_axis_type,new_y_axis_type):
         if new_x_axis_type == "log":
@@ -1186,7 +1189,6 @@ class SmartLineSeries(QLineSeries):
 
     def addData(self,x:float,y:float):
         self.append(x,y)
-        self.setName(f"My Series {self.label}")
         # if self.count()>1:
         #     self.interval = self.at(self.count()-1).x()-self.at(self.count()-2).x()
 
@@ -1253,6 +1255,40 @@ class SmartLineSeries(QLineSeries):
             if point.y()<0:
                 return True
         return False
+
+class SmartScatterSeries(QScatterSeries):
+    instance_count = 0
+    id_pool = set()
+    #init
+    def __init__(self,chart_view:SmartChartView,label:str=""):
+        super().__init__()
+        self.chart_view = chart_view
+        self.instance_count+=1
+        self.label = label
+        self.setMarkerSize(5)
+        self.setupID()
+    
+    def setupID(self):
+        # assign an id and try from 1,2,3,4,5... until an id is not in the id_pool
+        id = 1
+        while True:
+            # share id_pool with SmartLineSeries
+            if (id not in SmartLineSeries.id_pool) and (id not in SmartScatterSeries.id_pool):
+                SmartScatterSeries.id_pool.add(id)
+                break
+            id = id + 1
+        self.id = id
+
+    # add data
+    def addData(self,x:float,y:float):
+        self.append(x,y)
+    
+    def updateSeries(self,x_data:list,y_data:list):
+        self.clear()
+        for i in range(len(x_data)):
+            self.append(x_data[i],y_data[i])
+        self.setName(f"My Series {self.label}")
+    
 class VerticalLineMarker(QLineSeries):
     instance_count = 0
     id_pool = set()
