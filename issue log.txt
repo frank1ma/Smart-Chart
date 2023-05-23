@@ -1,13 +1,13 @@
 issue:
 
-√ 属性设置 默认去掉第二个subchart的标题等等
+√ property configuration UI draft
 
 √ meausre mod delete last measure / all measure
 
-√ log plot ticks设计 基本完成 
+√ log plot ticks design
 
 √ support scatter
 
-√ measure mark text的位置并不好： 目前可调整
+√ measure mark text's position can be adjusted
 
 √ 两条辅助线 交叉 有一条无法选中 : 已基本解决 在maximize window的时候: 与轴的scale有关。

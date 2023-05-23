@@ -1,14 +1,6 @@
 *.pyc
-smart_chart/__pycache__/*.pyc
-smart_chart/plot_navigator/__pycache__/*.pyc
-smart_chart/__pycache__/smart_chart_view.cpython-310.pyc
-smart_chart/plot_navigator/__pycache__/plot_navigator.cpython-310.pyc
-smart_chart/plot_navigator/__pycache__/ui_plot_navigator.cpython-310.pyc
-My Chart.csv
-test.py
-test2.py
-test2.py
-test3.py
-test4.py
-test5.py
-test6.py
+test*.py
+tf*.py
+tfviewer.ui
+main.py
+
