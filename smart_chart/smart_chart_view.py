@@ -518,6 +518,26 @@ class SmartChartView(QChartView):
     # calculate the cartisian distance between two points
     def calculateDistance(self, p1: QPointF, p2: QPointF):
         return math.sqrt((p1.x() - p2.x())**2 + (p1.y() - p2.y())**2)
+    
+    # calculate the gain margin of given the frequency as freq and magnitude as mag, and phase as phase
+    def calculateGainMargin(self, freq: list, mag: list, phase: list,dB:bool=True):
+        # check if -180 is in between any two points in phase list
+        for i in range(len(phase)-1):
+            if (phase[i] < -180 and phase[i+1] > -180) or (phase[i] > -180 and phase[i+1] < -180):
+                # interpolate the phase value at phase = -180
+                freq_at_neg_180 = (-180-phase[i]) * (freq[i+1] - freq[i]) / (phase[i+1] - phase[i])  + freq[i]
+                # calculate the mag at the same index with interpolated
+                mag_at_neg_180 = (mag[i+1] - mag[i]) / (freq[i+1] - freq[i]) * (freq_at_neg_180 - freq[i]) + mag[i]
+                # calculate the gain margin
+                if dB:
+                    gain_margin = 0 - mag_at_neg_180
+                else:
+                    gain_margin = 1 / mag_at_neg_180
+                print("the gain margin is ",gain_margin)
+                return gain_margin
+        print("Error no gain margin found!")
+        return None
+        
 
     # find nearst vertical line marker to the given x value
     def findNearestVLM(self, x: float):
