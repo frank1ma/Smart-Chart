@@ -533,12 +533,25 @@ class SmartChartView(QChartView):
                     gain_margin = 0 - mag_at_neg_180
                 else:
                     gain_margin = 1 / mag_at_neg_180
-                print("the gain margin is ",gain_margin)
-                return gain_margin
+                #print("the gain margin is ",gain_margin)
+                return gain_margin,freq_at_neg_180
         print("Error no gain margin found!")
         return None
+    
+    def calculatePhaseMargin(self, freq: list, mag: list, phase: list,dB:bool=True):
+        for i in range(len(mag)-1):
+            if (mag[i] < 0 and mag[i+1] > 0) or (mag[i] > 0 and mag[i+1] < 0):
+                # interpolate the phase value at phase = -180
+                freq_at_0dB = (-mag[i]) * (freq[i+1] - freq[i]) / (mag[i+1] - mag[i])  + freq[i]
+                # calculate the mag at the same index with interpolated
+                phase_at_0dB = (phase[i+1] - phase[i]) / (freq[i+1] - freq[i]) * (freq_at_0dB - freq[i]) + phase[i]
+                # calculate the gain margin
+                phase_margin = phase_at_0dB + 180
+                #print("the gain margin is ",gain_margin)
+                return phase_margin,freq_at_0dB
+        print("Error no phase margin found!")
+        return None
         
-
     # find nearst vertical line marker to the given x value
     def findNearestVLM(self, x: float):
         # if there is no vertical line marker nearby with 0.05 tolerance, return None
@@ -1080,20 +1093,24 @@ class SmartChartView(QChartView):
         #self.updateAuxLineMarker()
 
     # show the next intersection point of the given auxiliary line marker
-    def showNextIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
+    def showNextIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker],series=None):
         # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return
         # add a checkbox to ask user if he wants to show intersection point of all series
-        series_list = list(self.series_dict.values())
-        series_list = [series for series in series_list if series.isVisible()]
-        if len(series_list) == 0:
-            # show navigation's label message to tell user that there is no series to select
-            self.navigator.showLabelMsg("No series to select")
-            return
-        series_name_list = [series.name() for series in series_list]
-        series_name, ok = QInputDialog.getItem(self, "Select a series", "Series:", series_name_list, 0, False)
-        if not ok:
-            return
-        series = series_list[series_name_list.index(series_name)]
+        if series == None:
+            series_list = list(self.series_dict.values())
+            series_list = [series for series in series_list if series.isVisible()]
+            if len(series_list) == 0:
+                # show navigation's label message to tell user that there is no series to select
+                self.navigator.showLabelMsg("No series to select")
+                return
+            elif len(series_list) == 1:
+                series = series_list[0]
+            else:
+                series_name_list = [series.name() for series in series_list]
+                series_name, ok = QInputDialog.getItem(self, "Select a series", "Series:", series_name_list, 0, False)
+                if not ok:
+                    return
+                series = series_list[series_name_list.index(series_name)]
         intersection_points = self.revealAuxLineIntersectionPoint(alm, series)
         # show the next intersection point of the given auxiliary line marker
         if intersection_points!=[]:
@@ -1140,6 +1157,15 @@ class SmartChartView(QChartView):
         else:
             self.navigator.showLabelMsg("No intersection point found")
 
+    # display gain margin marker on the main chart
+    def showGainMarginMarker(self,freq:list,mag:list,phase:list,dB = True):
+        gain_margin,freq_neg_180 = self.calculateGainMargin(freq,mag,phase,dB)
+        if gain_margin!=None:
+            alm = self.addAuxiliaryLineMarker("vertical",freq_neg_180)
+            self.showNextIntersectionPoint(alm)
+            if self.sub_chart!=None:
+                self.sub_chart.addAuxiliaryLineMarker("vertical",freq_neg_180)
+            
     # pop up a diag to input the index of the intersection point to show
     def selectIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
         # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return

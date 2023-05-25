@@ -97,7 +97,7 @@ if __name__ == "__main__":
     window.show()
     
     #sys1 = control.tf([10], [1,1,1,1])
-    sys1 = control.zpk([-1],[-30,-1,-2,-3],100)
+    sys1 = control.zpk([-1],[-30,-1,-2,-3],300)
     mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
 
     widget:SmartChart = window.centralWidget()
@@ -105,4 +105,7 @@ if __name__ == "__main__":
     widget.chart_view.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")
     widget.chart_view2.plotXY(omega,phase/np.pi*180)
     widget.chart_view.calculateGainMargin(omega,20*np.log10(mag),phase/np.pi*180)
+    widget.chart_view.showGainMarginMarker(omega,20*np.log10(mag),phase/np.pi*180,True)
+    a = widget.chart_view.calculatePhaseMargin(omega,20*np.log10(mag),phase/np.pi*180,True)
+    print(a)
     app.exec()
