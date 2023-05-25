@@ -3,7 +3,7 @@ from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication,QMainWindow,QMenu,QToolButton,QFrame,QGridLayout
 from PySide6.QtCharts import QChart, QChartView,QLineSeries
 from PySide6.QtCore import QObject, QEvent,Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction,QResizeEvent
 #import plot_navigator
 from plot_navigator.plot_navigator import PlotNavigator
 from smart_chart_view import SmartChartView
@@ -80,6 +80,16 @@ class SmartChart(QFrame):
     
     def toggleSubNavBar(self):
         self.nav_bar2.setVisible(not self.nav_bar2.isVisible())
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self.chart_view.updateAuxLineMarker()
+        self.chart_view.updateMarkerText()
+        self.chart_view.updateAllVLM()
+        self.chart_view2.updateAuxLineMarker()
+        self.chart_view2.updateMarkerText()
+        self.chart_view2.updateAllVLM()
+        #self.chart_view.adjustYTicks()
+        return super().resizeEvent(event)
         
 
 
@@ -97,13 +107,18 @@ if __name__ == "__main__":
     window.show()
     
     #sys1 = control.tf([10], [1,1,1,1])
-    sys1 = control.zpk([-1],[-30,-1,-2,-3],300)
+    sys1 = control.zpk([-1],[-30,-1,-2,-3],15)
     mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
 
     widget:SmartChart = window.centralWidget()
     widget.chart_view.plotXY(omega,20*np.log10(mag))
     widget.chart_view.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")
+    widget.chart_view.x_axis.setTitleText("Frequency (Hz)")
+    widget.chart_view.y_axis.setTitleText("Magnitude (dB)")
     widget.chart_view2.plotXY(omega,phase/np.pi*180)
+    #widget.chart_view2.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")
+    widget.chart_view2.x_axis.setTitleText("Frequency (Hz)")
+    widget.chart_view2.y_axis.setTitleText("Phase (deg)")
     widget.chart_view.calculateGainMargin(omega,20*np.log10(mag),phase/np.pi*180)
     widget.chart_view.showGainMarginMarker(omega,20*np.log10(mag),phase/np.pi*180,True)
     a = widget.chart_view.calculatePhaseMargin(omega,20*np.log10(mag),phase/np.pi*180,True)

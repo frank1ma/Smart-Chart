@@ -3,8 +3,8 @@ from typing import Any,Optional,Union
 from plot_navigator.plot_navigator import PlotNavigator
 from plot_navigator.measure import Measure,MeasureMarker,PointMarker,VerticalAuxLineMarker,HorizontalAuxLineMarker
 from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries,QScatterSeries,QLogValueAxis,QAbstractAxis
-from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor
-from PySide6.QtCore import Qt,QEvent,QPointF,QEventLoop,QTimer
+from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor,QFont
+from PySide6.QtCore import Qt,QEvent,QPointF,QEventLoop,QTimer,QRectF
 from PySide6.QtWidgets import QGraphicsEllipseItem,QGraphicsTextItem,QApplication,QMenu,QColorDialog,QInputDialog
 import math
 import sys
@@ -58,9 +58,10 @@ class SmartChartView(QChartView):
 
         # set title
         self.chart().setTitle("My Chart")
-
-
+        self.chart().layout().setContentsMargins(10, 0, 10, 0)
+        self.chart().setContentsMargins(0, 0, 0, 0)
         self.setAxesProperty()
+
         # # set default x y axes and add series
         # self.x_axis = QLogValueAxis()
         # self.x_axis.setBase(10)
@@ -209,8 +210,17 @@ class SmartChartView(QChartView):
             self.sub_chart.chart().axisX().setRange(self.x_axis.min(),self.x_axis.max())
             self.sub_chart.chart().update()
         if self.sub_chart != None and self.subchart_sync_y_axis:
-            self.sub_chart.chart().axisY().setRange(self.y_axis.min()/self.default_y_range[0]*self.sub_chart.default_y_range[0],
-                                                    self.y_axis.max()/self.default_y_range[1]*self.sub_chart.default_y_range[1])
+            if self.default_y_range[0] == 0:
+                default_y_range_min = 0.1
+            else:
+                default_y_range_min = self.default_y_range[0]
+            if self.default_y_range[1] == 0:
+                default_y_range_max = 0.1
+            else:
+                default_y_range_max = self.default_y_range[1]
+
+            self.sub_chart.chart().axisY().setRange(self.y_axis.min()/default_y_range_min*self.sub_chart.default_y_range[0],
+                                                    self.y_axis.max()/default_y_range_max*self.sub_chart.default_y_range[1])
             self.sub_chart.chart().update()
 
     # setup navigator
@@ -232,6 +242,7 @@ class SmartChartView(QChartView):
             self.updateMarkerText()
         self.updateAuxLineMarker()
         self.updateSubChart()
+        self.updateMarkerText()
         QApplication.processEvents()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -334,6 +345,7 @@ class SmartChartView(QChartView):
         if ((event.buttons() & Qt.LeftButton and self.navigator.ui.pan_view_button.isChecked()) or 
             event.buttons() & Qt.MiddleButton):
             self.panChart(event)
+
         # if the vertical marker tool is active and the left mouse button is pressed, 
         # update the position of the vertical line
         elif event.buttons() & Qt.LeftButton and self.navigator.ui.vertical_marker_button.isChecked() and self.vlm_selected!=None:
@@ -341,6 +353,8 @@ class SmartChartView(QChartView):
             chart_point = self.chart().mapToValue(event.position())
             if chart_point.x() >= self.x_axis.min() and chart_point.x() <= self.x_axis.max():
                 self.vlm_selected.updateVLM(chart_point.x())
+                if self.vlm_selected.extended_vlm!=None:
+                    self.vlm_selected.extended_vlm.updateVLM(chart_point.x())
 
         # show the current mouse position in the position_label of the navigator, 2 decimal places
         elif event.buttons() & Qt.LeftButton and self.navigator.ui.zoom_button.isChecked():
@@ -349,12 +363,13 @@ class SmartChartView(QChartView):
         # show the SizeHorCursor when the mouse is near the vertical line
         elif self.navigator.ui.vertical_marker_button.isChecked():
             chart_point_x = self.chart().mapToValue(event.position()).x()
-            line_start_x = self.vertical_marker_dict[1].at(0).x()
-            if abs(chart_point_x- line_start_x) < 0.1:  # 10 pixels tolerance
-                # set mouse cursor to pan cursor
-                self.setCursor(Qt.CursorShape.SizeHorCursor)
-            else:
-                self.setCursor(Qt.CursorShape.ArrowCursor)
+            if self.vlm_selected!=None:
+                line_start_x = self.vlm_selected.at(0).x()
+                if abs(chart_point_x- line_start_x) < 0.1:  # 10 pixels tolerance
+                    # set mouse cursor to pan cursor
+                    self.setCursor(Qt.CursorShape.SizeHorCursor)
+                else:
+                    self.setCursor(Qt.CursorShape.ArrowCursor)
             
         # show the current mouse position in the position_label of the navigator, 2 decimal places
         else:
@@ -362,7 +377,6 @@ class SmartChartView(QChartView):
             self.navigator.ui.position_label.setText(f"({chart_point.x():.2f}, {chart_point.y():.2f})")
         #     ##reveal the nearest point in the series to the current mouse position
         #     #self.revealNearestPoint(chart_point)
-
         nearest_alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker] = self.findNearestAuxiliaryLine(self.chart().mapToValue(event.position()))
         if nearest_alm != None:
             # highlight the nearest auxiliary line
@@ -405,6 +419,12 @@ class SmartChartView(QChartView):
         # create a change color action
         change_color_action = QAction("Change Color", self)
         change_color_action.triggered.connect(lambda: self.changeVLMColor(vlm))
+        # extend the line to the top and bottom of the chart
+        extend_line_action = QAction("Extend Line to Subchart", self)
+        extend_line_action.triggered.connect(lambda: self.extendVLMToSubchart(vlm))
+        # cancel the extension of the line
+        cancel_extend_line_action = QAction("Cancel Extension", self)
+        cancel_extend_line_action.triggered.connect(lambda: self.cancelVLMExtension(vlm))
         # create a delete action
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(lambda: self.deleteVerticalLineMarker(vlm))
@@ -413,6 +433,10 @@ class SmartChartView(QChartView):
         menu.addAction(change_position_action)
         menu.addAction(change_width_action)
         menu.addAction(change_color_action)
+        if vlm.extended:
+            menu.addAction(cancel_extend_line_action)
+        else:
+            menu.addAction(extend_line_action)
         menu.addAction(delete_action)
         # show menu
         menu.popup(QCursor.pos())
@@ -554,11 +578,12 @@ class SmartChartView(QChartView):
         
     # find nearst vertical line marker to the given x value
     def findNearestVLM(self, x: float):
+        min_dis = min([abs(vlm.at(0).x() - x)/(x+0.01) for vlm in self.vertical_marker_dict.values()])
         # if there is no vertical line marker nearby with 0.05 tolerance, return None
-        if min([abs(vlm.at(0).x() - x) for vlm in self.vertical_marker_dict.values()]) > 0.05*(self.x_axis.max()-self.x_axis.min()):
+        if min_dis > 0.05:
             return None
         # find the vertical line marker with the minimum distance to the given x value
-        nearest_vlm = min(self.vertical_marker_dict.values(), key=lambda vlm: abs(vlm.at(0).x() - x))
+        nearest_vlm = min(self.vertical_marker_dict.values(), key=lambda vlm: abs(vlm.at(0).x() - x)/(x+0.01))
         return nearest_vlm
     
     # find nearst measure marker to the given point value
@@ -692,10 +717,17 @@ class SmartChartView(QChartView):
         try:
             delta = chart_point - self.last_mouse_pos
         except:
-            delta = QPointF(0,0)
-        # the pan sensitivity is inversely proportional to the zoom level
-        zoom_level_x = self.x_axis.max() / self.default_x_range[1]
-        zoom_level_y = self.y_axis.max() / self.default_y_range[1]
+            print("wrong point for pan")
+            return
+        #the pan sensitivity is inversely proportional to the zoom level
+        if self.default_x_range[1] == 0:
+            zoom_level_x = 1
+        else:
+            zoom_level_x = abs(self.x_axis.max()) / abs(self.default_x_range[1])
+        if self.default_y_range[1] == 0:
+            zoom_level_y = 1
+        else:
+            zoom_level_y = abs(self.y_axis.max()) / abs(self.default_y_range[1])
         # pan the chart
         self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x)*delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
         self.updateSubChart()
@@ -732,6 +764,7 @@ class SmartChartView(QChartView):
         # remove the given vertical line marker from the chart
         self.chart().removeSeries(vlm)
         self.chart().scene().removeItem(vlm.vlm_circle)
+        self.chart().scene().removeItem(vlm.text_item)
         # remove the given vertical line marker from the vertical_marker_dict
         del self.vertical_marker_dict[vlm.id]
         # dremove the id of the given vertical line marker from the id_pool
@@ -797,6 +830,32 @@ class SmartChartView(QChartView):
     def deleteAllMeasure(self):
         while len(self.measure_marker_dict)>0:
             self.deleteLastMeasure()
+
+    def extendVLMToSubchart(self, vlm: VerticalLineMarker):
+        if self.sub_chart == None: return
+        if vlm.extended == True: return
+        # get the x value of the given vertical line marker
+        x_value = vlm.at(0).x()
+        if len(self.sub_chart.series_dict) == 0: return
+        elif len(self.sub_chart.series_dict) == 1:
+            new_vlm = self.sub_chart.addVerticalLineMarker(list(self.sub_chart.series_dict.values())[0], x_value)
+            new_vlm.showVLM()
+            new_vlm.setExtended(vlm)
+            vlm.setExtended(new_vlm)
+
+        elif len(self.sub_chart.series_dict) > 1:
+            # open a dialog to let user choose a series
+            series_name, ok = QInputDialog.getItem(self, "Choose a series", "Series:", self.sub_chart.series_dict.keys(), 0, False)
+            if ok:
+                new_vlm = self.sub_chart.addVerticalLineMarker(self.sub_chart.series_dict[series_name], x_value)
+                new_vlm.showVLM()
+                new_vlm.setExtended(vlm)
+                vlm.setExtended(new_vlm)
+    
+    def cancelVLMExtension(self,vlm:VerticalLineMarker):
+        if vlm.extended == False or vlm.extended_vlm == None: return
+        self.sub_chart.deleteVerticalLineMarker(vlm.extended_vlm)
+        vlm.disableExtension()
 
     # change the color of the given measure marker
     def changeMeasureColor(self, mm: MeasureMarker):
@@ -972,10 +1031,10 @@ class SmartChartView(QChartView):
 
             self.y_axis = QValueAxis()
             self.y_axis.setLabelFormat("%g")
-            self.y_axis.setRange(min(y_data)-20,max(y_data)+40)
-            self.y_axis.setTickType(QValueAxis.TicksDynamic)
-            self.y_axis.setTickInterval(20)
-            self.y_axis.setTickAnchor(0)
+            self.y_axis.setRange(((min(y_data)-20)//20+1)*20,((max(y_data)+20)//20+1)*20)
+            #self.y_axis.setTickType(QValueAxis.TickType.TicksDynamic)
+            #self.y_axis.setTickInterval(20)
+            #self.y_axis.setTickAnchor(0)
             self.y_axis.setTitleText(y_label)
             
         elif self.plot_type == "bode_phase":
@@ -994,7 +1053,7 @@ class SmartChartView(QChartView):
             self.y_axis.setTickAnchor(-90)
             self.y_axis.setTickAnchor(180)
             self.y_axis.setTickAnchor(-180)
-            self.y_axis.setRange(-180, 180)
+            self.y_axis.setRange(min(y_data)-45, max(y_data)+45)
             self.y_axis.setTitleText(y_label)
 
         elif self.plot_type == "normal":
@@ -1012,6 +1071,26 @@ class SmartChartView(QChartView):
             self.y_axis.setTickType(QValueAxis.TicksDynamic)
             self.y_axis.setTickInterval(10)
         #series.updateProperty() # add interpolated version of series if necessary
+        # x label font size
+        self.x_axis.setLabelsFont(QFont("Arial", 8))
+        # y label font size
+        self.y_axis.setLabelsFont(QFont("Arial", 8))
+
+
+    def adjustYTicks(self):
+        if isinstance(self.y_axis,QValueAxis) and self.plot_type == "bode_mag":
+            height = self.chart().plotArea().height()
+            multiplier = 1
+            if height>200:
+                multiplier = 1.5
+            elif height>100:
+                multiplier = 2
+            elif height>50:
+                multiplier = 2.5
+            elif height>10:
+                multiplier = 3
+            dis = self.y_axis.max()-self.y_axis.min()
+            self.y_axis.setTickCount(dis//(20*multiplier))
 
     # set the chart title and subchart title as optional
     def setChartTitle(self, title:str, subchart_title:str=""):
@@ -1088,9 +1167,9 @@ class SmartChartView(QChartView):
         
         
         self.chart().update()
-        #self.updateSubChart()
-        #self.updateMarkerText()
-        #self.updateAuxLineMarker()
+        self.updateSubChart()
+        self.updateMarkerText()
+        self.updateAuxLineMarker()
 
     # show the next intersection point of the given auxiliary line marker
     def showNextIntersectionPoint(self, alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker],series=None):
@@ -1358,8 +1437,8 @@ class VerticalLineMarker(QLineSeries):
         self.chart_view.scene().addItem(self.vlm_circle)       # add the circle to the scene
         self.vlm_circle.setVisible(False)
 
-        pen = QPen(Qt.green)                                   # set up the pen color
-        pen.setWidth(3)                                        # set up the pen width
+        pen = QPen(Qt.black)                                   # set up the pen color
+        pen.setWidth(2)                                        # set up the pen width
         self.setPen(pen)                                       # set up the pen
 
         self.chart_view.addSeriestoXY(self,self.chart_view.x_axis,self.chart_view.y_axis,True) # add the series to the chart
@@ -1377,6 +1456,9 @@ class VerticalLineMarker(QLineSeries):
 
         # add the VLM to the vertical_marker_dict
         self.chart_view.vertical_marker_dict[self.id] = self
+
+        self.extended = False
+        self.extended_vlm = None
 
     def setupID(self):
         # assign an id and try from 1,2,3,4,5... until an id is not in the id_pool
@@ -1431,6 +1513,14 @@ class VerticalLineMarker(QLineSeries):
             self.text_item.setPos(text_pos)
         else:
             self.text_item.setPlainText("")
+    
+    def setExtended(self,vlm:VerticalLineMarker):
+        self.extended = True
+        self.extended_vlm = vlm
+
+    def disableExtension(self):
+        self.extended = False
+        self.extended_vlm = None
     
     def _convertPointFromChartViewtoViewPort(self, point:QPointF):
         top_point = self.chart_view.chart().mapToPosition(point)
