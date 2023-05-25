@@ -58,34 +58,8 @@ class SmartChartView(QChartView):
 
         # set title
         self.chart().setTitle("My Chart")
-        self.chart().layout().setContentsMargins(10, 0, 10, 0)
         self.chart().setContentsMargins(0, 0, 0, 0)
         self.setAxesProperty()
-
-        # # set default x y axes and add series
-        # self.x_axis = QLogValueAxis()
-        # self.x_axis.setBase(10)
-        # self.x_axis.setMinorTickCount(-1)
-        # self.x_axis.setLabelFormat("%g")
-
-        # self.x_axis.setRange(0.1, 2500)
-
-        # if self.plot_type == "bode_mag":
-        #     self.y_axis = QValueAxis()
-        #     self.y_axis.setTickType(QValueAxis.TicksDynamic)
-        #     self.y_axis.setTickInterval(20)
-        #     self.y_axis.setTickAnchor(0)
-        #     self.y_axis.setRange(-100, 10)
-        # elif self.plot_type == "bode_phase":
-        #     self.y_axis = QValueAxis()
-        #     self.y_axis.setTickType(QValueAxis.TicksDynamic)
-        #     self.y_axis.setTickInterval(45)
-        #     self.y_axis.setTickAnchor(0)
-        #     self.y_axis.setTickAnchor(90)
-        #     self.y_axis.setTickAnchor(-90)
-        #     self.y_axis.setTickAnchor(180)
-        #     self.y_axis.setTickAnchor(-180)
-        #     self.y_axis.setRange(-180, 180)
         
     # init options of charts
     def initOptions(self):
@@ -102,8 +76,9 @@ class SmartChartView(QChartView):
         self.is_point_near_threshold_x = 0.1
         self.is_point_near_threshold_y = 0.1
         self.interpolated_series_step = 0.01
-        self.pan_x_sensitivity = 1
-        self.pan_y_sensitivity = 1
+        self.pan_x_sensitivity = 0.5
+        self.pan_y_sensitivity = 0.5
+        self.zoom_in_level = 1.1
         self.last_highlighted_alm = None
         self.subchart_sync_x_axis = True
         self.subchart_sync_y_axis = True
@@ -206,22 +181,20 @@ class SmartChartView(QChartView):
 
     # sync the x range of the sub chart with the main chart(self)
     def updateSubChart(self):
-        if self.sub_chart != None and self.subchart_sync_x_axis:
-            self.sub_chart.chart().axisX().setRange(self.x_axis.min(),self.x_axis.max())
-            self.sub_chart.chart().update()
-        if self.sub_chart != None and self.subchart_sync_y_axis:
-            if self.default_y_range[0] == 0:
-                default_y_range_min = 0.1
-            else:
-                default_y_range_min = self.default_y_range[0]
-            if self.default_y_range[1] == 0:
-                default_y_range_max = 0.1
-            else:
-                default_y_range_max = self.default_y_range[1]
-
-            self.sub_chart.chart().axisY().setRange(self.y_axis.min()/default_y_range_min*self.sub_chart.default_y_range[0],
-                                                    self.y_axis.max()/default_y_range_max*self.sub_chart.default_y_range[1])
-            self.sub_chart.chart().update()
+        if self.sub_chart != None:
+            if self.subchart_sync_x_axis:
+                self.sub_chart.chart().axisX().setRange(self.x_axis.min(),self.x_axis.max())
+                self.sub_chart.chart().update()
+            if self.subchart_sync_y_axis:
+                y_min_percent = (self.y_axis.min()-self.default_y_range[0])/(self.default_y_range[1]-self.default_y_range[0])
+                y_max_percent = (self.y_axis.max()-self.default_y_range[1])/(self.default_y_range[1]-self.default_y_range[0])
+                sub_y_range = self.sub_chart.default_y_range[1]-self.sub_chart.default_y_range[0]
+                self.sub_chart.chart().axisY().setRange(sub_y_range*y_min_percent+self.sub_chart.default_y_range[0],
+                                                        sub_y_range*y_max_percent+self.sub_chart.default_y_range[1])
+                self.sub_chart.chart().update()
+            self.sub_chart.updateAuxLineMarker()
+            self.sub_chart.updateMarkerText()
+            self.sub_chart.updateAllVLM()
 
     # setup navigator
     def setupNavigator(self, navigator: PlotNavigator):
