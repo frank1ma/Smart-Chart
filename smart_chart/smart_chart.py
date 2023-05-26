@@ -2,7 +2,7 @@
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication,QMainWindow,QMenu,QToolButton,QFrame,QGridLayout
 from PySide6.QtCharts import QChart, QChartView,QLineSeries
-from PySide6.QtCore import QObject, QEvent,Qt
+from PySide6.QtCore import QObject, QEvent,Qt,QPointF
 from PySide6.QtGui import QAction,QResizeEvent
 #import plot_navigator
 from plot_navigator.plot_navigator import PlotNavigator
@@ -115,7 +115,19 @@ if __name__ == "__main__":
     widget.chart_view.plotXY(phase/np.pi*180,20*np.log10(mag))
     widget.chart_view.sub_chart=None
     widget.chart_view2.hide()
-    widget.chart_view.addMNCircles()
+    #widget.chart_view.addMNCircles()
+    #widget.chart_view.addCircle(-0.5)
+    widget.chart_view.addCircle(10**(6/20))
+    widget.chart_view.addCircle(10**(3/20))
+    widget.chart_view.addCircle(10**(-1/20))
+    widget.chart_view.addCircle(10**(0.5/20))
+    widget.chart_view.addCircle(10**(0.25/20))
+    widget.chart_view.addCircle(10**(-1/20))
+    widget.chart_view.addCircle(10**(-3/20))
+    widget.chart_view.addCircle(10**(-6/20))
+    widget.chart_view.addCircle(10**(-12/20))
+    widget.chart_view.addCircle(10**(-20/20))
+    # widget.chart_view.addCircle(10)
     # widget.chart_view.plotXY(omega,20*np.log10(mag))
     #widget.chart_view.changeAxesType(new_x_axis_type="linear",new_y_axis_type="log")
     # widget.chart_view.x_axis.setTitleText("Frequency (Hz)")

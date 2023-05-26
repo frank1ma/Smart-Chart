@@ -735,14 +735,59 @@ class SmartChartView(QChartView):
         new_vlm = VerticalLineMarker(self,series,x_pos)
         return new_vlm
     
-    def addCircle(self,center,radius):
+    def addCircle(self,m:float):
+        center = QPointF(-m**2/(m**2-1),0)
+        radius = np.sqrt(m**2/(m**2-1)**2)
+        angle_array = []
+        mag_array = []
         # create a circle data series
-        for i in range(0,360):
-            angle = i
-            x = center.x() + radius * math.cos(math.radians(angle))
-            y = center.y() + radius * math.sin(math.radians(angle))
-            self.circle_series.append(x,y)
+        for i in np.arange(0,360,1):
+            x = center.x() + radius * math.cos(math.radians(i))
+            y = center.y() + radius * math.sin(math.radians(i))
+            mag =np.abs(x+y*1j)
+            angle = np.angle(x+y*1j, deg=True)
+            angle_array.append(angle)
+            mag_array.append(mag)
+        angle_array= np.unwrap(angle_array,period=360,discont=180)
+        centers = self.findMCircleCenter()
+        for center in centers:
+            new_series = QLineSeries()
+            new_series.setPen(QPen(Qt.GlobalColor.gray, 1, Qt.PenStyle.DashLine))
+            angle_arr = self.adjustNicholsPhase(center, angle_array)
+            print(center)
+            print(angle_arr)
+            for angle,mag in zip(angle_arr,mag_array):
+                new_series.append(angle,20*np.log10(mag))
+            self.chart().addSeries(new_series)
+            self.chart().setAxisX(self.x_axis, new_series)
+            self.chart().setAxisY(self.y_axis, new_series)
+
+    def findMCircleCenter(self):
+        # determine if -180,180,180+360,-180-360 is in the current x range
+        center = []
+        for multiple in range(-10,11):
+            if -180 + multiple * 360 > self.x_axis.min() and -180 + multiple * 360 < self.x_axis.max():
+                center.append(-180 + multiple * 360)
+        return center
     
+    def adjustNicholsPhase(self,center, phase_array:np.ndarray):
+        # adjust the phase array by adding 360 or minusing 360 to make sure the center is in the array
+        min_phase = min(phase_array)
+        max_phase = max(phase_array)
+        while min_phase - center >= 180:
+            phase_array -= 360
+            min_phase = min(phase_array)
+        while max_phase - center <= -180:
+            phase_array += 360
+            max_phase = max(phase_array)
+        # for i in range(len(phase_array)):
+        #     while phase_array[i] - center > 180:
+        #         phase_array[i] -= 360
+        #     while phase_array[i] - center < -180:
+        #         phase_array[i] += 360
+        return phase_array
+
+
     def addMNCircles(self):
         mn_series = QLineSeries()
         mn2_series = QLineSeries()
