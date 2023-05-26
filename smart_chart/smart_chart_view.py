@@ -218,6 +218,9 @@ class SmartChartView(QChartView):
         self.updateMarkerText()
         QApplication.processEvents()
 
+    def wrapPhase(self, phase:np.ndarray):
+        return np.remainder(phase/np.pi*180 + 180, 360) - 180
+
     def mousePressEvent(self, event: QMouseEvent):
         # pan the chart by left click and drag or middle click and drag
         if self.navigator.ui.zoom_button.isChecked():
@@ -732,6 +735,54 @@ class SmartChartView(QChartView):
         new_vlm = VerticalLineMarker(self,series,x_pos)
         return new_vlm
     
+    def addCircle(self,center,radius):
+        # create a circle data series
+        for i in range(0,360):
+            angle = i
+            x = center.x() + radius * math.cos(math.radians(angle))
+            y = center.y() + radius * math.sin(math.radians(angle))
+            self.circle_series.append(x,y)
+    
+    def addMNCircles(self):
+        mn_series = QLineSeries()
+        mn2_series = QLineSeries()
+        last_angle = None
+        m_list = [1]
+        # create an array from -100,100, with 0.1 as step
+        for m in m_list:
+            for y in np.arange(-10,100,0.01):
+                x = -1/2
+                angle = np.angle(x+y*1j, deg=True)
+                if last_angle != None:
+                    if angle - last_angle>50:
+                        angle = angle - 360
+                    elif angle - last_angle<-50:
+                        angle = angle + 360
+                last_angle = angle
+                mag = np.abs(x+y*1j)
+                mn_series.append(angle,20*np.log10(mag))
+                mn2_series.append(angle+360,20*np.log10(mag))
+ 
+                #res = (m/(1-m**2))**2 - (x - m**2/(1-m**2))**2
+                #if abs(res) <0.01: print(x)
+                # if res >=0:
+                #     y = np.sqrt(res)
+                #     angle = np.angle(x+y*1j, deg=True)
+                #     mag = np.abs(x+y*1j)
+                #     mn_series.append(angle,20*np.log10(mag))
+                # else:
+                #     y = -np.sqrt(-res)
+                #     angle = np.angle(x+y*1j, deg=True)
+                #     mag = np.abs(x+y*1j)
+                #     mn_series.append(angle,20*np.log10(mag))
+            
+        self.chart().addSeries(mn_series)
+        self.chart().setAxisX(self.x_axis, mn_series)
+        self.chart().setAxisY(self.y_axis, mn_series)
+        self.chart().addSeries(mn2_series)
+        self.chart().setAxisX(self.x_axis, mn2_series)
+        self.chart().setAxisY(self.y_axis, mn2_series)
+
     # delete the given vertical line marker
     def deleteVerticalLineMarker(self, vlm: VerticalLineMarker):
         # remove the given vertical line marker from the chart
@@ -1028,6 +1079,19 @@ class SmartChartView(QChartView):
             self.y_axis.setTickAnchor(-180)
             self.y_axis.setRange(min(y_data)-45, max(y_data)+45)
             self.y_axis.setTitleText(y_label)
+        
+        elif self.plot_type == "nichols":
+            self.x_axis = QValueAxis()
+            self.x_axis.setLabelFormat("%g")
+            self.x_axis.setRange(-360,0)
+            self.x_axis.setTitleText(x_label)
+            self.x_axis.setTickType(QValueAxis.TicksDynamic)
+            self.x_axis.setTickInterval(45)
+
+            self.y_axis = QValueAxis()
+            self.y_axis.setLabelFormat("%g")
+            self.y_axis.setRange(((min(y_data)-20)//20+1)*20,((max(y_data)+20)//20+1)*20)
+            self.y_axis.setTitleText(y_label)
 
         elif self.plot_type == "normal":
             self.x_axis = QValueAxis()
@@ -1040,7 +1104,7 @@ class SmartChartView(QChartView):
             self.y_axis = QValueAxis()
             self.y_axis.setLabelFormat("%g")
             self.y_axis.setRange(min(y_data),max(y_data))
-            self.x_axis.setTitleText(y_label)
+            self.y_axis.setTitleText(y_label)
             self.y_axis.setTickType(QValueAxis.TicksDynamic)
             self.y_axis.setTickInterval(10)
         #series.updateProperty() # add interpolated version of series if necessary
@@ -1518,18 +1582,20 @@ class VerticalLineMarker(QLineSeries):
         points = [(p.x(), p.y()) for p in lineseries.pointsVector()]
         if not points:
             return None
-
+        min_x =min(points[0][0],points[-1][0])
+        max_x =max(points[0][0],points[-1][0])
         # If x_value is out of range, return the nearest point's y-value
-        if x_value < points[0][0]:
+        if x_value < min_x:
             return None
-        if x_value > points[-1][0]:
+        if x_value > max_x:
             return None
 
         for i in range(len(points) - 1):
             x1, y1 = points[i]
             x2, y2 = points[i + 1]
-
-            if x1 <= x_value <= x2:
+            point_left_x = min(x1, x2)
+            point_right_x = max(x1, x2)
+            if point_left_x <= x_value <= point_right_x:
                 # Linear interpolation
                 y_value = y1 + (x_value - x1) * (y2 - y1) / (x2 - x1)
                 return y_value
