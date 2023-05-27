@@ -735,13 +735,14 @@ class SmartChartView(QChartView):
         new_vlm = VerticalLineMarker(self,series,x_pos)
         return new_vlm
     
-    def addCircle(self,m:float):
+    def addMCircles(self,m:float):
         center = QPointF(-m**2/(m**2-1),0)
         radius = np.sqrt(m**2/(m**2-1)**2)
         angle_array = []
         mag_array = []
         # create a circle data series
-        for i in np.arange(0,360,1):
+        iter_array = np.concatenate((np.arange(0,10,.1),np.arange(10,350,1),np.arange(350,360.1,0.1)))
+        for i in iter_array:
             x = center.x() + radius * math.cos(math.radians(i))
             y = center.y() + radius * math.sin(math.radians(i))
             mag =np.abs(x+y*1j)
@@ -754,10 +755,48 @@ class SmartChartView(QChartView):
             new_series = QLineSeries()
             new_series.setPen(QPen(Qt.GlobalColor.gray, 1, Qt.PenStyle.DashLine))
             angle_arr = self.adjustNicholsPhase(center, angle_array)
-            print(center)
-            print(angle_arr)
             for angle,mag in zip(angle_arr,mag_array):
                 new_series.append(angle,20*np.log10(mag))
+            self.chart().addSeries(new_series)
+            self.chart().setAxisX(self.x_axis, new_series)
+            self.chart().setAxisY(self.y_axis, new_series)
+    
+    def getNCircles(self,alpha:float):
+        #phase_array = [10,20,30,40,60,80,120,-120,-80,-60,-40,-30,-20,-10]
+        N = np.tan(alpha/180*np.pi)
+        center =QPointF(-1/2,1/(2*N))
+        radius = np.sqrt(1/4+(1/(2*N))**2)
+        angle_array = []
+        mag_array = []
+        iter_array = np.concatenate((np.arange(0,10,.1),np.arange(10,350,1),np.arange(350,360.1,0.1)))
+        for i in iter_array:
+            if i == 270: continue
+            x = center.x() + radius * math.cos(math.radians(i))
+            y = center.y() + radius * math.sin(math.radians(i))
+            mag =np.abs(x+y*1j)
+            angle = np.angle(x+y*1j, deg=True)
+            if mag == 0 and angle ==0: continue
+            if 20*np.log10(mag) < -40: continue
+            angle_array.append(angle)
+            mag_array.append(mag)
+        #print(min(angle_array))
+        angle_array= list(np.unwrap(angle_array,period=360,discont=180))
+        angle_array.append(min(angle_array)-0.1)
+        mag_array.append(10**(-1000/20))
+        angle_array.append(max(angle_array)+0.1)
+        mag_array.append(10**(-1000/20))
+        centers = self.findMCircleCenter()
+        for center in centers:
+            new_series = QLineSeries()
+            angle_arr = self.adjustNicholsPhase(center, np.array(angle_array))
+            for angle,mag in zip(angle_arr,mag_array):
+                new_series.append(angle,20*np.log10(mag))
+            points = new_series.points()
+            points.sort(key=lambda point: (point.x(), point.y()))
+            new_series = QLineSeries()
+            new_series.setPen(QPen(Qt.GlobalColor.gray, 1, Qt.PenStyle.DashLine))
+            for point in points:
+                new_series.append(point)
             self.chart().addSeries(new_series)
             self.chart().setAxisX(self.x_axis, new_series)
             self.chart().setAxisY(self.y_axis, new_series)
@@ -766,8 +805,10 @@ class SmartChartView(QChartView):
         # determine if -180,180,180+360,-180-360 is in the current x range
         center = []
         for multiple in range(-10,11):
-            if -180 + multiple * 360 > self.x_axis.min() and -180 + multiple * 360 < self.x_axis.max():
+            if -180 + multiple * 360 >= self.x_axis.min() and -180 + multiple * 360 <= self.x_axis.max():
                 center.append(-180 + multiple * 360)
+        center.append(min(center)-360)
+        center.append(max(center)+360)
         return center
     
     def adjustNicholsPhase(self,center, phase_array:np.ndarray):
@@ -786,47 +827,18 @@ class SmartChartView(QChartView):
         #     while phase_array[i] - center < -180:
         #         phase_array[i] += 360
         return phase_array
-
-
-    def addMNCircles(self):
-        mn_series = QLineSeries()
-        mn2_series = QLineSeries()
-        last_angle = None
-        m_list = [1]
-        # create an array from -100,100, with 0.1 as step
-        for m in m_list:
-            for y in np.arange(-10,100,0.01):
-                x = -1/2
-                angle = np.angle(x+y*1j, deg=True)
-                if last_angle != None:
-                    if angle - last_angle>50:
-                        angle = angle - 360
-                    elif angle - last_angle<-50:
-                        angle = angle + 360
-                last_angle = angle
-                mag = np.abs(x+y*1j)
-                mn_series.append(angle,20*np.log10(mag))
-                mn2_series.append(angle+360,20*np.log10(mag))
- 
-                #res = (m/(1-m**2))**2 - (x - m**2/(1-m**2))**2
-                #if abs(res) <0.01: print(x)
-                # if res >=0:
-                #     y = np.sqrt(res)
-                #     angle = np.angle(x+y*1j, deg=True)
-                #     mag = np.abs(x+y*1j)
-                #     mn_series.append(angle,20*np.log10(mag))
-                # else:
-                #     y = -np.sqrt(-res)
-                #     angle = np.angle(x+y*1j, deg=True)
-                #     mag = np.abs(x+y*1j)
-                #     mn_series.append(angle,20*np.log10(mag))
-            
-        self.chart().addSeries(mn_series)
-        self.chart().setAxisX(self.x_axis, mn_series)
-        self.chart().setAxisY(self.y_axis, mn_series)
-        self.chart().addSeries(mn2_series)
-        self.chart().setAxisX(self.x_axis, mn2_series)
-        self.chart().setAxisY(self.y_axis, mn2_series)
+    
+    def kickOutliers(self,array:np.ndarray):
+        new_array = []
+        # kick out the outliers in the array
+        mean = np.mean(array)
+        std = np.std(array)
+        for i in range(len(array)):
+            if array[i] > mean + 3 * std or array[i] < mean - 3 * std:
+                print("outliers",array[i])
+            else:
+                new_array.append(array[i])
+        return new_array
 
     # delete the given vertical line marker
     def deleteVerticalLineMarker(self, vlm: VerticalLineMarker):
