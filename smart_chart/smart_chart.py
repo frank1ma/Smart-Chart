@@ -113,9 +113,12 @@ if __name__ == "__main__":
     widget:SmartChart = window.centralWidget()
     #wrapped_phase_degree = widget.chart_view.wrapPhase(phase)
     widget.chart_view.plotXY(phase/np.pi*180,20*np.log10(mag))
+    widget.chart_view.nichols_frequency_data = omega
     widget.chart_view.sub_chart=None
     widget.chart_view2.hide()
     widget.chart_view.showNicholsGrid()
+    widget.chart_view.showNicholsMargin(10,50)
+    widget.chart_view.hideNicholsMargin()
     #widget.chart_view.addMNCircles()
     # widget.chart_view.addMCircles(10**(6/20))
     # widget.chart_view.addMCircles(10**(3/20))

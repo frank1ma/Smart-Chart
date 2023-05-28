@@ -1,15 +1,14 @@
 from __future__ import annotations
-from typing import Any,Optional,Union
+from typing import Union
 from plot_navigator.plot_navigator import PlotNavigator
 from plot_navigator.measure import Measure,MeasureMarker,PointMarker,VerticalAuxLineMarker,HorizontalAuxLineMarker
 from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries,QScatterSeries,QLogValueAxis,QAbstractAxis
-from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor,QFont
-from PySide6.QtCore import Qt,QEvent,QPointF,QEventLoop,QTimer,QRectF
+from PySide6.QtGui import QPainter, QMouseEvent,QWheelEvent,QPen,QAction,QCursor,QFont,QColor
+from PySide6.QtCore import Qt,QPointF
 from PySide6.QtWidgets import QGraphicsEllipseItem,QGraphicsTextItem,QApplication,QMenu,QColorDialog,QInputDialog
 import math
 import sys
 import numpy as np
-import control
 
 class SmartChartView(QChartView):
 
@@ -84,6 +83,8 @@ class SmartChartView(QChartView):
         self.subchart_sync_y_axis = True
         self.nichols_grid = None
         self.nichols_grid_text = False
+        self.nichols_margin_lines = False
+        self.nichols_frequency_data = None
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -542,6 +543,17 @@ class SmartChartView(QChartView):
                     add_nichols_grid_text_action = QAction("Turn on Nichols Grid Text", self)
                     add_nichols_grid_text_action.triggered.connect(self.nichols_grid.showText)
                     menu.addAction(add_nichols_grid_text_action)
+                
+                alm_h_exist,alm_v_exist = self._checkNicholsMarginLine()
+
+                if (self.nichols_margin_lines) and (alm_h_exist or alm_v_exist):
+                    remove_nichols_margin_lines_action = QAction("Turn off Stability Margin Lines", self)
+                    remove_nichols_margin_lines_action.triggered.connect(self.hideNicholsMargin)
+                    menu.addAction(remove_nichols_margin_lines_action)
+                else:
+                    add_nichols_margin_lines_action = QAction("Turn on Stability Margin Lines", self)
+                    add_nichols_margin_lines_action.triggered.connect(self.showNicholsMargin)
+                    menu.addAction(add_nichols_margin_lines_action)
         # add actions to menu
         menu.addAction(add_vertical_action)
         menu.addAction(add_horizontal_action)
@@ -1075,9 +1087,12 @@ class SmartChartView(QChartView):
         if ok:
             vlm.updateVLM(new_pos)
     # change the color of the given auxiliary line marker
-    def changeAuxLineColor(self, alm: Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
+    def changeAuxLineColor(self, alm: Union[VerticalAuxLineMarker, HorizontalAuxLineMarker],color:QColor=None):
+        if color == None:
         # open a color dialog
-        color = QColorDialog.getColor()
+            color = QColorDialog.getColor()
+        else:
+            color = QColor(color)
         # if the user clicks OK, change the color of the given auxiliary line marker
         if color.isValid():
             alm.pen_backup.setColor(color)
@@ -1437,7 +1452,54 @@ class SmartChartView(QChartView):
             else:
                 self.nichols_grid.hideGrid()
                 self.nichols_grid = None
+    
+    def showStabilityMargin(self):
+        if self.plot_type == "nichols":
+            self.showNicholsMargin()
 
+    def showNicholsMargin(self,gm:float=10,pm:float=50,color:str="red"):
+        self.nichols_margin_alm_h=self.addAuxiliaryLineMarker("horizontal",0-gm)
+        self.nichols_margin_alm_v=self.addAuxiliaryLineMarker("vertical",-180+pm)
+        self.changeAuxLineColor(self.nichols_margin_alm_h,color)    
+        self.changeAuxLineColor(self.nichols_margin_alm_v,color)
+        self.nichols_margin_lines = True
+
+    def hideNicholsMargin(self):
+        if self.plot_type == "nichols":
+            alm_h_exist,alm_v_exist = self._checkNicholsMarginLine()
+            if alm_h_exist:
+                self.deleteAuxiliaryLineMarker(self.nichols_margin_alm_h)
+                del self.nichols_margin_alm_h
+            if alm_v_exist:
+                self.deleteAuxiliaryLineMarker(self.nichols_margin_alm_v)
+                del self.nichols_margin_alm_v
+            self.nichols_margin_lines = False
+    
+    def _checkNicholsMarginLine(self):
+        if hasattr(self,"nichols_margin_alm_h"):
+            if self.nichols_margin_alm_h!=None:
+                if self.nichols_margin_alm_h in self.aux_line_dict.values():
+                    alm_h_exist = True
+                else:
+                    alm_h_exist = False
+            else:
+                alm_h_exist = False
+        else:
+            alm_h_exist = False
+
+        if hasattr(self,"nichols_margin_alm_v"):
+            if self.nichols_margin_alm_v!=None:
+                if self.nichols_margin_alm_v in self.aux_line_dict.values():
+                    alm_v_exist = True
+                else:
+                    alm_v_exist = False
+            else:
+                alm_v_exist = False
+        else:
+            alm_v_exist = False        
+
+        return alm_h_exist,alm_v_exist
+    
     # pop up a diag to input the index of the intersection point to show
     def selectIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
         # pop up a dialog to ask user to select a series to show intersection point, if no series is selected, return
@@ -1700,8 +1762,15 @@ class VerticalLineMarker(QLineSeries):
 
         # interpolate y value and show (x,y) in the text item
         y_value = self._interpolate_y_value(self.series,x_value)
+        freq = QLineSeries()
+        for index,data in enumerate(self.chart_view.nichols_frequency_data):
+            freq.append(index,data)
+        freq_y_value = self._interpolate_y_value(freq,x_value)
         if y_value != None:
-            self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f})")
+            if self.chart_view.plot_type == "nichols":
+                self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f}),freq:{freq_y_value:.2f}")
+            else:
+                self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f})")
             text_pos = self.chart().mapToPosition(QPointF(x_value,y_value)) + QPointF(10, -20)  # Adjust the offset as needed
             self.text_item.setPos(text_pos)
         else:
