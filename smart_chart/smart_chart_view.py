@@ -83,6 +83,7 @@ class SmartChartView(QChartView):
         self.subchart_sync_x_axis = True
         self.subchart_sync_y_axis = True
         self.nichols_grid = None
+        self.nichols_grid_text = False
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -289,7 +290,7 @@ class SmartChartView(QChartView):
                 elif (not self.navigator.ui.measure_button.isChecked() and
                     not self.navigator.ui.vertical_marker_button.isChecked() and
                     not self.navigator.ui.zoom_button.isChecked()):
-                    self.createAddAuxLineMenu(chart_point)
+                    self.createGeneralMenu(chart_point)
         
         super().mousePressEvent(event)
         QApplication.processEvents()
@@ -375,16 +376,16 @@ class SmartChartView(QChartView):
                 self.chart().update()
                 QApplication.processEvents()
         
-        if self.nichols_grid!=None:
+        if self.nichols_grid!=None and self.nichols_grid_text:
             chart_point = self.chart().mapToValue(event.position())
             nearest_mc,dB_label = self.findNearestMCircle(chart_point)
             nearest_nc,deg_label = self.findNearestNCircle(chart_point)
             if nearest_mc!=None and nearest_nc!=None:
-                self.navigator.showLabelMsg(f"{dB_label:g} dB, {deg_label:g} deg",time=10000)
+                self.navigator.showLabelMsg(f"{dB_label:g} dB, {deg_label:g} deg",time=5000)
             elif nearest_mc!=None:
-                self.navigator.showLabelMsg(f"{dB_label:g} dB",time=10000)
+                self.navigator.showLabelMsg(f"{dB_label:g} dB",time=5000)
             elif nearest_nc!=None:
-                self.navigator.showLabelMsg(f"{deg_label:g} deg",time=10000)
+                self.navigator.showLabelMsg(f"{deg_label:g} deg",time=5000)
 
         super().mouseMoveEvent(event)  # call the base class method to allow zooming by rubber band
         QApplication.processEvents()
@@ -512,7 +513,7 @@ class SmartChartView(QChartView):
         menu.popup(QCursor.pos())
 
     # create popup menu for adding the auxiliary line marker at the blank area
-    def createAddAuxLineMenu(self, pos: QPointF):
+    def createGeneralMenu(self, pos: QPointF):
         # create a menu
         menu = QMenu(self)
         # create a add vertical auxiliary line marker action
@@ -526,10 +527,21 @@ class SmartChartView(QChartView):
         if self.plot_type == "nichols":
             if self.nichols_grid == None:
                 add_nichols_grid_action = QAction("Turn on Nichols Grid", self)
+                add_nichols_grid_action.triggered.connect(lambda: self.showNicholsGrid())
+                menu.addAction(add_nichols_grid_action)
             else:
-                add_nichols_grid_action = QAction("Turn off Nichols Grid", self)
-            add_nichols_grid_action.triggered.connect(lambda: self.showNicholsGrid())
-            menu.addAction(add_nichols_grid_action)
+                remove_nichols_grid_action = QAction("Turn off Nichols Grid", self) 
+                remove_nichols_grid_action.triggered.connect(lambda: self.showNicholsGrid())
+                menu.addAction(remove_nichols_grid_action)
+                # add actions to turn off the M N circle's text
+                if self.nichols_grid_text:
+                    remove_nichols_grid_text_action = QAction("Turn off Nichols Grid Text", self)
+                    remove_nichols_grid_text_action.triggered.connect(self.nichols_grid.hideText)
+                    menu.addAction(remove_nichols_grid_text_action)
+                else:
+                    add_nichols_grid_text_action = QAction("Turn on Nichols Grid Text", self)
+                    add_nichols_grid_text_action.triggered.connect(self.nichols_grid.showText)
+                    menu.addAction(add_nichols_grid_text_action)
         # add actions to menu
         menu.addAction(add_vertical_action)
         menu.addAction(add_horizontal_action)
@@ -1809,6 +1821,12 @@ class NicholsGrid:
         self.m_circles_list = []
         self.n_circles_list = []    
 
+    def hideText(self):
+        self.chart_view.nichols_grid_text = False
+
+    def showText(self):
+        self.chart_view.nichols_grid_text = True
+
     def _findMNCircleCenter(self):
         # determine if -180,180,180+360,-180-360 is in the current x range
         center = []
@@ -1883,7 +1901,7 @@ class NCircle:
         radius = np.sqrt(1/4+(1/(2*N))**2)
         angle_array = []
         mag_array = []
-        iter_array = np.concatenate((np.arange(0,10,.1),np.arange(10,350,.1),np.arange(350,360,0.1)))
+        iter_array = np.concatenate((np.arange(0,5,.1),np.arange(5,355,1),np.arange(355,360,0.1)))
         for i in iter_array:
             if i == 270: continue
             x = center.x() + radius * math.cos(math.radians(i))
