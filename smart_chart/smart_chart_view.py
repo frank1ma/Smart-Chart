@@ -82,6 +82,7 @@ class SmartChartView(QChartView):
         self.last_highlighted_alm = None
         self.subchart_sync_x_axis = True
         self.subchart_sync_y_axis = True
+        self.nichols_grid = None
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -376,7 +377,14 @@ class SmartChartView(QChartView):
         
         if self.nichols_grid!=None:
             chart_point = self.chart().mapToValue(event.position())
-            self.findNearestMCircle(chart_point)
+            nearest_mc,dB_label = self.findNearestMCircle(chart_point)
+            nearest_nc,deg_label = self.findNearestNCircle(chart_point)
+            if nearest_mc!=None and nearest_nc!=None:
+                self.navigator.showLabelMsg(f"{dB_label:g} dB, {deg_label:g} deg",time=10000)
+            elif nearest_mc!=None:
+                self.navigator.showLabelMsg(f"{dB_label:g} dB",time=10000)
+            elif nearest_nc!=None:
+                self.navigator.showLabelMsg(f"{deg_label:g} deg",time=10000)
 
         super().mouseMoveEvent(event)  # call the base class method to allow zooming by rubber band
         QApplication.processEvents()
@@ -513,6 +521,15 @@ class SmartChartView(QChartView):
         # create a add horizontal auxiliary line marker action
         add_horizontal_action = QAction("Add Horizontal Auxiliary Line Marker", self)
         add_horizontal_action.triggered.connect(lambda: self.addAuxiliaryLineMarker("horizontal",pos.y()))
+
+        # if self.plot_type == "nichols", create a add turn on/off nichols grid action
+        if self.plot_type == "nichols":
+            if self.nichols_grid == None:
+                add_nichols_grid_action = QAction("Turn on Nichols Grid", self)
+            else:
+                add_nichols_grid_action = QAction("Turn off Nichols Grid", self)
+            add_nichols_grid_action.triggered.connect(lambda: self.showNicholsGrid())
+            menu.addAction(add_nichols_grid_action)
         # add actions to menu
         menu.addAction(add_vertical_action)
         menu.addAction(add_horizontal_action)
@@ -560,7 +577,7 @@ class SmartChartView(QChartView):
     def findNearestVLM(self, x: float):
         min_dis = min([abs(vlm.at(0).x() - x)/(x+0.01) for vlm in self.vertical_marker_dict.values()])
         # if there is no vertical line marker nearby with 0.05 tolerance, return None
-        if min_dis > 0.05:
+        if abs(min_dis) > 0.05:
             return None
         # find the vertical line marker with the minimum distance to the given x value
         nearest_vlm = min(self.vertical_marker_dict.values(), key=lambda vlm: abs(vlm.at(0).x() - x)/(x+0.01))
@@ -835,11 +852,39 @@ class SmartChartView(QChartView):
         index = self.nichols_grid.m_circles_series_list.index(nearst_mc)
 
         #print(nearst_mc)
-        if min_dis < 0.05*(self.x_axis.max() - self.x_axis.min()):
-            db_label = 20*np.log10(self.nichols_grid.m_circles_list[index%9].magnitude)
-            self.navigator.showLabelMsg(f"{db_label:g} dB")
+        if min_dis < 0.08*(self.x_axis.max() - self.x_axis.min()):
+            num_of_mag = len(self.nichols_grid.m_circle_magnitude)
+            db_label = 20*np.log10(self.nichols_grid.m_circles_list[index%num_of_mag].magnitude)
+            return nearst_mc,db_label
+        
+        return None,None
+        self.navigator.showLabelMsg(f"{db_label:g} dB")
 
+    def findNearestNCircle(self,point:QPointF):
+        if self.nichols_grid == None: return None
+        min_dis = 100000
+        nearst_nc = None
+        for nc in self.nichols_grid.n_circles_series_list:
+            # find the minimum distance between the point and the point on the circle
+            min = 100000
+            for nc_point in nc.points():
+                #print(self.calculateDistance(point,mc_point))
+                if self.calculateDistance(point,nc_point) < min:
+                    min = self.calculateDistance(point,nc_point)
+            #print(min)
+            if min < min_dis:
+                min_dis = min
+                nearst_nc = nc
 
+        #return the index of nearst_mc in the m_circles_series_list
+        index = self.nichols_grid.n_circles_series_list.index(nearst_nc)
+
+        #print(nearst_mc)
+        if min_dis < 0.08*(self.x_axis.max() - self.x_axis.min()):
+            num_of_phase = len(self.nichols_grid.n_circle_phase)
+            phase_label = self.nichols_grid.n_circles_list[index%num_of_phase].phase
+            return nearst_nc,phase_label
+        return None,None
 
     def adjustNicholsPhase(self,center, phase_array:np.ndarray):
         # adjust the phase array by adding 360 or minusing 360 to make sure the center is in the array
@@ -943,7 +988,9 @@ class SmartChartView(QChartView):
             self.deleteLastMeasure()
 
     def extendVLMToSubchart(self, vlm: VerticalLineMarker):
-        if self.sub_chart == None: return
+        if self.sub_chart == None: 
+            self.navigator.showLabelMsg("No SubChart!")
+            return
         if vlm.extended == True: return
         # get the x value of the given vertical line marker
         x_value = vlm.at(0).x()
@@ -1372,8 +1419,12 @@ class SmartChartView(QChartView):
     def showNicholsGrid(self):
         # show nichols grid on the main chart
         if self.plot_type == "nichols":
-            self.nichols_grid = NicholsGrid(self)
-            self.nichols_grid.showGrid()
+            if self.nichols_grid == None:
+                self.nichols_grid = NicholsGrid(self)
+                self.nichols_grid.showGrid()
+            else:
+                self.nichols_grid.hideGrid()
+                self.nichols_grid = None
 
     # pop up a diag to input the index of the intersection point to show
     def selectIntersectionPoint(self,alm:Union[VerticalAuxLineMarker,HorizontalAuxLineMarker]):
@@ -1707,14 +1758,23 @@ class NicholsGrid:
         self.n_circles_series_list = []
 
     def _initMCircle(self):
-        m_circle_magnitude = [0.1,0.25,0.5,3,6,-3,-6,-12,-20]
+        self.m_circle_magnitude = [0,0.25,0.5,3,6,-1,-3,-6,-12,-20]
         # create a circle data series
-        for mag in m_circle_magnitude:
+        for mag in self.m_circle_magnitude:
             m_circle = MCircle(self.chart_view,10**(mag/20))
             self.m_circles_list.append(m_circle)
 
+    def _initNCircle(self):
+        self.n_circle_phase = [1,5,10,20,30,40,60,80,100,120,140,150,160,170,175,179]
+        #self.n_circle_phase = [1]
+        # create a circle data series
+        for phase in self.n_circle_phase:
+            n_circle = NCircle(self.chart_view,phase)
+            self.n_circles_list.append(n_circle)
+
     def showGrid(self):
         self._initMCircle()
+        self._initNCircle()
         for mn_center in self.mn_centers:
             for m_circle in self.m_circles_list:
                 phase_array = self._adjustNicholsPhase(mn_center,m_circle.angle_array)
@@ -1722,12 +1782,32 @@ class NicholsGrid:
                 new_series.setPen(QPen(Qt.GlobalColor.gray, 1, Qt.PenStyle.DashLine))
                 for angle,mag in zip(phase_array,m_circle.mag_array):
                     new_series.append(angle,20*np.log10(mag))
-                #m_circle.showMagnitudeMarker(mn_center)
                 self.m_circles_series_list.append(new_series)
-                self.chart.addSeries(new_series)
-                self.chart.setAxisX(self.chart_view.x_axis, new_series)
-                self.chart.setAxisY(self.chart_view.y_axis, new_series)
-   
+                self.chart_view.addSeriestoXY(new_series,self.chart_view.x_axis,self.chart_view.y_axis)
+
+            for n_circle in self.n_circles_list:
+                new_series = QLineSeries()
+                angle_arr = self._adjustNicholsPhase(mn_center, np.array(n_circle.angle_array))
+                for angle,mag in zip(angle_arr,n_circle.mag_array):
+                    new_series.append(angle,20*np.log10(mag))
+                points = new_series.points()
+                points.sort(key=lambda point: (point.x(), point.y()))
+                new_series = QLineSeries()
+                new_series.setPen(QPen(Qt.GlobalColor.gray, 1, Qt.PenStyle.DashLine))
+                for point in points:
+                    new_series.append(point)
+                self.n_circles_series_list.append(new_series)
+                self.chart_view.addSeriestoXY(new_series,self.chart_view.x_axis,self.chart_view.y_axis)
+    
+    def hideGrid(self):
+        for series in self.m_circles_series_list:
+            self.chart_view.chart().removeSeries(series)
+        for series in self.n_circles_series_list:
+            self.chart_view.chart().removeSeries(series)
+        self.m_circles_series_list = []
+        self.n_circles_series_list = []
+        self.m_circles_list = []
+        self.n_circles_list = []    
 
     def _findMNCircleCenter(self):
         # determine if -180,180,180+360,-180-360 is in the current x range
@@ -1750,8 +1830,6 @@ class NicholsGrid:
             phase_array += 360
             max_phase = max(phase_array)
         return phase_array
-
-
     
 class MCircle:
     def __init__(self,chart_view:SmartChartView,magnitude:float):
@@ -1761,12 +1839,22 @@ class MCircle:
         self.angle_array,self.mag_array,self.center,self.radius = self.calculateCircle(magnitude)
     
     def calculateCircle(self,magnitude:float):
+        angle_array = []
+        mag_array = []
+        if magnitude == 1:
+            iter_array = np.concatenate((np.arange(-100,-5,1),np.arange(-5,5,.01),np.arange(5,100,1)))
+            for y in iter_array:
+                angle = np.angle(-1/2+y*1j, deg=True)
+                mag = np.abs(-1/2+y*1j)
+                angle_array.append(angle)
+                mag_array.append(mag)
+                angle_array_ndarray= np.unwrap(angle_array,period=360,discont=180)
+            return angle_array_ndarray,mag_array,QPointF(-1/2,0),0
         # center of M circle
         center = QPointF(-magnitude**2/(magnitude**2-1),0)
         # radius of M circle
         radius = np.sqrt(magnitude**2/(magnitude**2-1)**2)
-        angle_array = []
-        mag_array = []
+
         # create a circle data series
         iter_array = np.concatenate((np.arange(0,10,.1),np.arange(10,350,1),np.arange(350,360,0.1)))
 
@@ -1778,35 +1866,58 @@ class MCircle:
             angle_array.append(angle)
             mag_array.append(mag)
 
-        angle_array= np.unwrap(angle_array,period=360,discont=180)
+        angle_array= np.unwrap(angle_array,period=360,discont=180)   
 
         return angle_array,mag_array,center,radius
     
 class NCircle:
-    def __init__(self,chart_view:SmartChartView,magnitude:float):
+    def __init__(self,chart_view:SmartChartView,phase:float):
         super().__init__()
-        self.magnitude = magnitude
+        self.phase = phase
         self.chart_view = chart_view
-        self.angle_array,self.mag_array,self.center,self.radius = self.calculateCircle(magnitude)
+        self.angle_array,self.mag_array,self.center,self.radius = self.calculateCircle(phase)
     
-    def calculateCircle(self,magnitude:float):
-        # center of M circle
-        center = QPointF(-magnitude**2/(magnitude**2-1),0)
-        # radius of M circle
-        radius = np.sqrt(magnitude**2/(magnitude**2-1)**2)
+    def calculateCircle(self,alpha:float):
+        N = np.tan(alpha/180*np.pi)
+        center =QPointF(-1/2,1/(2*N))
+        radius = np.sqrt(1/4+(1/(2*N))**2)
         angle_array = []
         mag_array = []
-        # create a circle data series
-        iter_array = np.concatenate((np.arange(0,10,.1),np.arange(10,350,1),np.arange(350,360,0.1)))
-
+        iter_array = np.concatenate((np.arange(0,10,.1),np.arange(10,350,.1),np.arange(350,360,0.1)))
         for i in iter_array:
+            if i == 270: continue
             x = center.x() + radius * math.cos(math.radians(i))
             y = center.y() + radius * math.sin(math.radians(i))
             mag =np.abs(x+y*1j)
             angle = np.angle(x+y*1j, deg=True)
+            if mag == 0 and angle ==0: continue
+            if 20*np.log10(mag) < -40: continue
             angle_array.append(angle)
             mag_array.append(mag)
-
-        angle_array= np.unwrap(angle_array,period=360,discont=180)
-
+        #mag_array,angle_array= self._removePhaseData(mag_array,angle_array)
+        angle_array= list(np.unwrap(angle_array,period=360,discont=180))
+        #mag_array,angle_array= self._removePhaseData(mag_array,angle_array)
+        angle_array.append(min(angle_array)-0.1)
+        mag_array.append(10**(-100/20))
+        angle_array.append(max(angle_array)+0.1)
+        mag_array.append(10**(-100/20))
+        
         return angle_array,mag_array,center,radius
+    
+    def _removePhaseData(self,mag_array:list,angle_array:list):
+        magnitude = 10**(6/20)
+        center = QPointF(-magnitude**2/(magnitude**2-1),0)
+        radius = np.sqrt(magnitude**2/(magnitude**2-1)**2)
+        # check if the points on n_circle is in the circle that defined by center and radius
+        new_mag_array = []
+        new_angle_array = []
+        for i in range(len(angle_array)):
+            point_on_n_cirlce_x = mag_array[i]*np.cos(angle_array[i]/180*np.pi)
+            point_on_n_cirlce_y = mag_array[i]*np.sin(angle_array[i]/180*np.pi)
+            # if point_on_n_cirlce is in the circle, remove the point
+            dis = (point_on_n_cirlce_x-center.x())**2+(point_on_n_cirlce_y-center.y())**2
+            if dis > radius**2:
+                # remove the ith point
+                new_mag_array.append(mag_array[i])
+                new_angle_array.append(angle_array[i])
+        return new_mag_array,new_angle_array
