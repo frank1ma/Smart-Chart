@@ -1761,13 +1761,14 @@ class VerticalLineMarker(QLineSeries):
         self.showVLM()
 
         # interpolate y value and show (x,y) in the text item
-        y_value = self._interpolate_y_value(self.series,x_value)
+        y_value,ratio,i = self._interpolate_y_value(self.series,x_value)
         freq = QLineSeries()
         for index,data in enumerate(self.chart_view.nichols_frequency_data):
-            freq.append(index,data)
-        freq_y_value = self._interpolate_y_value(freq,x_value)
+            freq.append(index,data) 
+        if ratio!=None:
+            freq_y_value = self._interpolate_freq_value(freq,i,ratio)
         if y_value != None:
-            if self.chart_view.plot_type == "nichols":
+            if self.chart_view.plot_type == "nichols" and ratio!=None:
                 self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f}),freq:{freq_y_value:.2f}")
             else:
                 self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f})")
@@ -1806,14 +1807,14 @@ class VerticalLineMarker(QLineSeries):
     def _interpolate_y_value(self,lineseries:QLineSeries, x_value):
         points = [(p.x(), p.y()) for p in lineseries.pointsVector()]
         if not points:
-            return None
+            return None,None,None
         min_x =min(points[0][0],points[-1][0])
         max_x =max(points[0][0],points[-1][0])
         # If x_value is out of range, return the nearest point's y-value
         if x_value < min_x:
-            return None
+            return None,None,None
         if x_value > max_x:
-            return None
+            return None,None,None
 
         for i in range(len(points) - 1):
             x1, y1 = points[i]
@@ -1823,9 +1824,23 @@ class VerticalLineMarker(QLineSeries):
             if point_left_x <= x_value <= point_right_x:
                 # Linear interpolation
                 y_value = y1 + (x_value - x1) * (y2 - y1) / (x2 - x1)
-                return y_value
+                ratio =  (x_value -point_left_x)/(point_right_x-point_left_x)
+                return y_value,ratio,i
 
-        return None
+        return None,None,None
+    
+    def _interpolate_freq_value(self,lineseries:QLineSeries, i:int,ratio:float):
+        points = [(p.x(), p.y()) for p in lineseries.pointsVector()]
+        if not points:
+            return None
+
+        x1, y1 = points[i]
+        x2, y2 = points[i + 1]
+        point_left_y = min(y1, y2)
+        point_right_y = max(y1, y2)
+        # Linear interpolation
+        y_value =   (point_right_y - point_left_y)*ratio + point_left_y
+        return y_value
 
 class NicholsGrid:
     def __init__(self,chart_view:SmartChartView):
