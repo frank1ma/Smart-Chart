@@ -85,6 +85,7 @@ class SmartChartView(QChartView):
         self.nichols_grid_text = False
         self.nichols_margin_lines = False
         self.nichols_frequency_data = None
+        self.nichols_frequency_series = None
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -206,20 +207,26 @@ class SmartChartView(QChartView):
     def setSubChat(self, sub_chart:SmartChartView):
         self.sub_chart = sub_chart
 
+    def setNicholsFrequencyData(self,frequency_data):
+        self.nichols_frequency_series = QLineSeries()
+        for index,data in enumerate(frequency_data):
+            self.nichols_frequency_series.append(index,data) 
+
     def wheelEvent(self, event: QWheelEvent):
-        # zoom in or out using the mouse wheel
-        if event.angleDelta().y() > 0:
-            self.chart().zoomIn()
-        else:
-            self.chart().zoomOut()
-        if self.navigator.ui.vertical_marker_button.isChecked():
-            self.updateAllVLM()
-        if self.navigator.ui.measure_button.isChecked():
+        if self.navigator.ui.zoom_button.isChecked():
+            # zoom in or out using the mouse wheel
+            if event.angleDelta().y() > 0:
+                self.chart().zoomIn()
+            else:
+                self.chart().zoomOut()
+            if self.navigator.ui.vertical_marker_button.isChecked():
+                self.updateAllVLM()
+            if self.navigator.ui.measure_button.isChecked():
+                self.updateMarkerText()
+            self.updateAuxLineMarker()
+            self.updateSubChart()
             self.updateMarkerText()
-        self.updateAuxLineMarker()
-        self.updateSubChart()
-        self.updateMarkerText()
-        QApplication.processEvents()
+            QApplication.processEvents()
 
     def wrapPhase(self, phase:np.ndarray):
         return np.remainder(phase/np.pi*180 + 180, 360) - 180
@@ -581,7 +588,7 @@ class SmartChartView(QChartView):
                 #print("the gain margin is ",gain_margin)
                 return gain_margin,freq_at_neg_180
         print("Error no gain margin found!")
-        return None
+        return None,None
     
     def calculatePhaseMargin(self, freq: list, mag: list, phase: list,dB:bool=True):
         for i in range(len(mag)-1):
@@ -824,7 +831,6 @@ class SmartChartView(QChartView):
             if 20*np.log10(mag) < -40: continue
             angle_array.append(angle)
             mag_array.append(mag)
-        #print(min(angle_array))
         angle_array= list(np.unwrap(angle_array,period=360,discont=180))
         angle_array.append(min(angle_array)-0.1)
         mag_array.append(10**(-1000/20))
@@ -864,10 +870,8 @@ class SmartChartView(QChartView):
             # find the minimum distance between the point and the point on the circle
             min = 100000
             for mc_point in mc.points():
-                #print(self.calculateDistance(point,mc_point))
                 if self.calculateDistance(point,mc_point) < min:
                     min = self.calculateDistance(point,mc_point)
-            #print(min)
             if min < min_dis:
                 min_dis = min
                 nearst_mc = mc
@@ -875,7 +879,6 @@ class SmartChartView(QChartView):
         #return the index of nearst_mc in the m_circles_series_list
         index = self.nichols_grid.m_circles_series_list.index(nearst_mc)
 
-        #print(nearst_mc)
         if min_dis < 0.08*(self.x_axis.max() - self.x_axis.min()):
             num_of_mag = len(self.nichols_grid.m_circle_magnitude)
             db_label = 20*np.log10(self.nichols_grid.m_circles_list[index%num_of_mag].magnitude)
@@ -892,10 +895,8 @@ class SmartChartView(QChartView):
             # find the minimum distance between the point and the point on the circle
             min = 100000
             for nc_point in nc.points():
-                #print(self.calculateDistance(point,mc_point))
                 if self.calculateDistance(point,nc_point) < min:
                     min = self.calculateDistance(point,nc_point)
-            #print(min)
             if min < min_dis:
                 min_dis = min
                 nearst_nc = nc
@@ -903,7 +904,6 @@ class SmartChartView(QChartView):
         #return the index of nearst_mc in the m_circles_series_list
         index = self.nichols_grid.n_circles_series_list.index(nearst_nc)
 
-        #print(nearst_mc)
         if min_dis < 0.08*(self.x_axis.max() - self.x_axis.min()):
             num_of_phase = len(self.nichols_grid.n_circle_phase)
             phase_label = self.nichols_grid.n_circles_list[index%num_of_phase].phase
@@ -926,18 +926,6 @@ class SmartChartView(QChartView):
         #     while phase_array[i] - center < -180:
         #         phase_array[i] += 360
         return phase_array
-    
-    def kickOutliers(self,array:np.ndarray):
-        new_array = []
-        # kick out the outliers in the array
-        mean = np.mean(array)
-        std = np.std(array)
-        for i in range(len(array)):
-            if array[i] > mean + 3 * std or array[i] < mean - 3 * std:
-                print("outliers",array[i])
-            else:
-                new_array.append(array[i])
-        return new_array
 
     # delete the given vertical line marker
     def deleteVerticalLineMarker(self, vlm: VerticalLineMarker):
@@ -1762,13 +1750,10 @@ class VerticalLineMarker(QLineSeries):
 
         # interpolate y value and show (x,y) in the text item
         y_value,ratio,i = self._interpolate_y_value(self.series,x_value)
-        freq = QLineSeries()
-        for index,data in enumerate(self.chart_view.nichols_frequency_data):
-            freq.append(index,data) 
-        if ratio!=None:
-            freq_y_value = self._interpolate_freq_value(freq,i,ratio)
+        if ratio!=None and self.chart_view.nichols_frequency_series!=None:
+            freq_y_value = self._interpolate_freq_value(self.chart_view.nichols_frequency_series,i,ratio)
         if y_value != None:
-            if self.chart_view.plot_type == "nichols" and ratio!=None:
+            if self.chart_view.plot_type == "nichols" and ratio!=None and self.chart_view.nichols_frequency_series!=None:
                 self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f}),freq:{freq_y_value:.2f}")
             else:
                 self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f})")
@@ -1997,12 +1982,12 @@ class NCircle:
             angle_array.append(angle)
             mag_array.append(mag)
         #mag_array,angle_array= self._removePhaseData(mag_array,angle_array)
+        #mag_array1,mag_array2,angle_array1,angle_array2 = self._partitionPhaseData(mag_array,angle_array)
         angle_array= list(np.unwrap(angle_array,period=360,discont=180))
-        #mag_array,angle_array= self._removePhaseData(mag_array,angle_array)
-        angle_array.append(min(angle_array)-0.1)
-        mag_array.append(10**(-100/20))
-        angle_array.append(max(angle_array)+0.1)
-        mag_array.append(10**(-100/20))
+        # angle_array.append(min(angle_array)-0.1)
+        # mag_array.append(10**(-100/20))
+        # angle_array.append(max(angle_array)+0.1)
+        # mag_array.append(10**(-100/20))
         
         return angle_array,mag_array,center,radius
     
@@ -2023,3 +2008,9 @@ class NCircle:
                 new_mag_array.append(mag_array[i])
                 new_angle_array.append(angle_array[i])
         return new_mag_array,new_angle_array
+    
+    def _partitionPhaseData(self,mag_array:list,angle_array:list):
+        for i in range(len(angle_array)):
+            if abs(angle_array[i+1] - angle_array[i])>5:
+                return mag_array[0:i+1],mag_array[i+1:],angle_array[0:i+1],angle_array[i+1:]
+        return None
