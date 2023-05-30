@@ -1,20 +1,20 @@
 # import necessary modules in PySide6
-from PySide6.QtCore import QObject
-from PySide6.QtWidgets import QApplication,QMainWindow,QMenu,QToolButton,QFrame,QGridLayout
+from PySide6.QtWidgets import QApplication,QMainWindow,QMenu,QFrame,QGridLayout
 from PySide6.QtCharts import QChart, QChartView,QLineSeries
-from PySide6.QtCore import QObject, QEvent,Qt,QPointF
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction,QResizeEvent
-#import plot_navigator
 from plot_navigator.plot_navigator import PlotNavigator
 from smart_chart_view import SmartChartView
 import control
 import numpy as np
-#add plot_navigator/icon/plot_navigator_rc.py into python path
 
 # create smart chart class as QFrame
 class SmartChart(QFrame):
+    """
+    SmartChart is a QFrame that contains a chart view and a navigation bar.
+    """
     # constructor
-    def __init__(self, plot_type:str="normal",sub_plot_type:str="bode_phase", *args, **kwargs):
+    def __init__(self, *args, plot_type:str="normal",sub_plot_type:str="bode_phase", **kwargs):
         # call super class constructor
         super().__init__(*args, **kwargs)
         layout = QGridLayout(self)
@@ -57,9 +57,9 @@ class SmartChart(QFrame):
 
         # right click on the smart chart to pop up a menu
         self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_context_menu)
+        self.customContextMenuRequested.connect(self.showContextMenu)
     
-    def show_context_menu(self, pos):
+    def showContextMenu(self, pos):
         # if pos is on any chart view, return
         if self.chart_view.geometry().contains(pos) or self.chart_view2.geometry().contains(pos):
             return
@@ -109,7 +109,6 @@ if __name__ == "__main__":
     #sys1 = control.tf([10], [1,1,1,1])
     sys1 = control.zpk([-1,-2,4],[-30,-1,-2,-3],100)
     mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
-
     widget:SmartChart = window.centralWidget()
     #wrapped_phase_degree = widget.chart_view.wrapPhase(phase)
     # widget.chart_view.plotXY(phase/np.pi*180,20*np.log10(mag))
