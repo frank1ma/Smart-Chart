@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'plot_navigatorhXngsw.ui'
+## Form generated from reading UI file 'plot_navigatorjeATEG.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.5.0
+## Created by: Qt User Interface Compiler version 6.4.3
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -60,7 +60,7 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.measure_button)
 
-        self.pan_view_button = QPushButton(plot_navigator)
+        self.pan_view_button = CustomToolButton(plot_navigator)
         self.pan_view_button.setObjectName(u"pan_view_button")
         self.pan_view_button.setMaximumSize(QSize(36, 16777215))
         icon3 = QIcon()

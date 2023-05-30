@@ -18,8 +18,9 @@ class PlotNavigator(QFrame):
         self.chart_options = {}
         self.ui = Ui_plot_navigator()
         self.ui.setupUi(self)
-        self._initSignalSlot()
         self._initPopMenu()
+        self._initSignalSlot()
+        
 
        
         
@@ -53,10 +54,16 @@ class PlotNavigator(QFrame):
         #click the save_button to save the chart to svg, png, pdf, jpg,eps
         self.ui.save_button.clicked.connect(self.saveChart)
 
+        # #check / uncheck the pan_view_button pop menu
+        self.pan_pop_menu.actions()[0].triggered.connect(lambda: self.togglePanChart("x"))
+        self.pan_pop_menu.actions()[1].triggered.connect(lambda: self.togglePanChart("y"))
+        self.pan_pop_menu.actions()[2].triggered.connect(lambda: self.togglePanChart("both"))
+
     def _initPopMenu(self):
         self._initVerticalMarkerButtonPopMenu()
         self._initOriginViewButtonPopMenu()
         self._initMeasureButtonPopMenu()
+        self._initPanButtonPopMenu()
 
     # init popmenu of the vertical marker button
     def _initVerticalMarkerButtonPopMenu(self):
@@ -138,6 +145,31 @@ class PlotNavigator(QFrame):
         # connect the action to the slot
         set_action.triggered.connect(self.setDefualtView)
         restore_action.triggered.connect(self.restoreOriginView)
+
+    def _initPanButtonPopMenu(self):
+        # create a pop menu
+        self.pan_pop_menu = QMenu(self)
+        # add pan x direction only action
+        pan_x_action = QAction("Pan X Direction Only",self)
+        # add pan y direction only action
+        pan_y_action = QAction("Pan Y Direction Only",self)
+        # add pan x and y direction action
+        pan_xy_action = QAction("Pan X and Y Direction",self)
+        # create a action for the pop menu
+        self.pan_pop_menu.addAction(pan_x_action)
+        self.pan_pop_menu.addAction(pan_y_action)
+        self.pan_pop_menu.addAction(pan_xy_action)
+        # set pan x direction only action to checkable
+        pan_x_action.setCheckable(True)
+        pan_y_action.setCheckable(True)
+        pan_xy_action.setCheckable(True)
+        # set the pop menu to the pan_view_button
+        self.ui.pan_view_button.setMenu(self.pan_pop_menu)
+
+        # connect the action to the slot
+        pan_x_action.triggered.connect(self.enablePanChart)
+        pan_y_action.triggered.connect(self.enablePanChart)
+        pan_xy_action.triggered.connect(self.enablePanChart)
 
     # show default vertical marker
     def showVerticalMarker(self):
@@ -266,11 +298,47 @@ class PlotNavigator(QFrame):
             else:
                 self.showLabelMsg("Series Saved", 3000)
 
+    def togglePanChart(self,direction):
+        if direction == "x":
+            if not self.pan_pop_menu.actions()[0].isChecked():
+                self.pan_pop_menu.actions()[0].setChecked(False)
+            else:
+                self.pan_pop_menu.actions()[0].setChecked(True)
+                self.pan_pop_menu.actions()[1].setChecked(False)
+                self.pan_pop_menu.actions()[2].setChecked(False)
+                self.main_chart_view.pan_direction = "x"
+                
+        elif direction == "y":
+            if not self.pan_pop_menu.actions()[1].isChecked():
+                #print("y1")
+                self.pan_pop_menu.actions()[1].setChecked(False)
+            else:
+                #print("y2")
+                self.pan_pop_menu.actions()[0].setChecked(False)
+                self.pan_pop_menu.actions()[1].setChecked(True)
+                self.pan_pop_menu.actions()[2].setChecked(False)
+                self.main_chart_view.pan_direction = "y"
+        elif direction == "both":
+            if not self.pan_pop_menu.actions()[2].isChecked():
+                self.pan_pop_menu.actions()[2].setChecked(False)
+            else:
+                self.pan_pop_menu.actions()[0].setChecked(False)
+                self.pan_pop_menu.actions()[1].setChecked(False)
+                self.pan_pop_menu.actions()[2].setChecked(True)
+                self.main_chart_view.pan_direction = "both"
+        
     # pan the chart
     def enablePanChart(self):
         if self.ui.pan_view_button.isChecked():
             self.main_chart_view.setRubberBand(QChartView.NoRubberBand)
             self.main_chart_view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+            if self.pan_pop_menu.actions()[0].isChecked():
+                self.main_chart_view.pan_direction = "x"
+            elif self.pan_pop_menu.actions()[1].isChecked():
+                print("y checked")
+                self.main_chart_view.pan_direction = "y"
+            else:
+                self.main_chart_view.pan_direction = "both"
             if self.ui.zoom_button.isChecked():  # if zoom button is checked, uncheck it
                 self.ui.zoom_button.setChecked(False)
         else:

@@ -87,6 +87,7 @@ class SmartChartView(QChartView):
         self.nichols_margin_lines = False
         self.nichols_frequency_data = None
         self.nichols_frequency_series = None
+        self.pan_direction = "both"
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -333,7 +334,7 @@ class SmartChartView(QChartView):
         # pan the chart if the pan tool is active or the middle mouse button is pressed
         if ((event.buttons() & Qt.LeftButton and self.navigator.ui.pan_view_button.isChecked()) or
                 event.buttons() & Qt.MiddleButton):
-            self.panChart(event)
+            self.panChart(event,self.pan_direction)
 
         # if the vertical marker tool is active and the left mouse button is pressed,
         # update the position of the vertical line
@@ -804,7 +805,7 @@ class SmartChartView(QChartView):
             return None
 
     # pan the chart by the given event
-    def panChart(self, event: QMouseEvent):
+    def panChart(self, event: QMouseEvent,direction:str="both"):
         # convert the mouse position to a chart point
         chart_point = self.chart().mapToValue(event.position())
         # pan the chart by the difference between the last mouse position and the current mouse position
@@ -825,8 +826,14 @@ class SmartChartView(QChartView):
             zoom_level_y = abs(self.y_axis.max()) / \
                 abs(self.default_y_range[1])
         # pan the chart
-        self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x) *
-                            delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
+        if direction == "both":
+            self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x) *
+                                delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
+        elif direction == "x":
+            self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x) *
+                                delta.x(), 0)
+        elif direction == "y":
+            self.chart().scroll(0, -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
         self.updateSubChart()
         self.updateMarkerText()
         self.updateAuxLineMarker()
@@ -1669,7 +1676,7 @@ class SmartLineSeries(QLineSeries):
         self.clear()
         for i in range(len(x_data)):
             self.append(x_data[i], y_data[i])
-        self.setName(f"My Series {self.label}")
+        self.setName(f"{self.label}")
         if len(x_data) > 0:
             self.interval = x_data[1]-x_data[0]
 
