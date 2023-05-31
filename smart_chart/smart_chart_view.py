@@ -632,7 +632,6 @@ class SmartChartView(QChartView):
                     gain_margin = 0 - mag_at_neg_180
                 else:
                     gain_margin = 1 / mag_at_neg_180
-                # print("the gain margin is ",gain_margin)
                 return gain_margin, freq_at_neg_180
         print("Error no gain margin found!")
         return None, None
@@ -1332,7 +1331,8 @@ class SmartChartView(QChartView):
         elif self.plot_type == "nichols":
             self.x_axis = QValueAxis()
             self.x_axis.setLabelFormat("%g")
-            self.x_axis.setRange(-360, 0)
+            self.x_axis.setRange(min(x_data)-20, max(x_data)+20)
+            #self.x_axis.setRange(-360, 0)
             self.x_axis.setTitleText(x_label)
             self.x_axis.setTickType(QValueAxis.TicksDynamic)
             self.x_axis.setTickInterval(45)
@@ -2039,8 +2039,9 @@ class NicholsGrid:
         for multiple in range(-10, 11):
             if -180 + multiple * 360 >= self.chart_view.x_axis.min() and -180 + multiple * 360 <= self.chart_view.x_axis.max():
                 center.append(-180 + multiple * 360)
-        center.append(min(center)-360)
-        center.append(max(center)+360)
+        if center != []:
+            center.append(min(center)-360)
+            center.append(max(center)+360)
         return center
 
     def _adjustNicholsPhase(self, center, phase_array: np.ndarray):
@@ -2132,10 +2133,10 @@ class NCircle:
         # mag_array,angle_array= self._removePhaseData(mag_array,angle_array)
         # mag_array1,mag_array2,angle_array1,angle_array2 = self._partitionPhaseData(mag_array,angle_array)
         angle_array = list(np.unwrap(angle_array, period=360, discont=180))
-        # angle_array.append(min(angle_array)-0.1)
-        # mag_array.append(10**(-100/20))
-        # angle_array.append(max(angle_array)+0.1)
-        # mag_array.append(10**(-100/20))
+        angle_array.append(min(angle_array)-0.1)
+        mag_array.append(10**(-1000/20))
+        angle_array.append(max(angle_array)+0.1)
+        mag_array.append(10**(-1000/20))
 
         return angle_array, mag_array, center, radius
 

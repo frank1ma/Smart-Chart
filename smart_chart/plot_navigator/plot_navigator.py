@@ -335,7 +335,6 @@ class PlotNavigator(QFrame):
             if self.pan_pop_menu.actions()[0].isChecked():
                 self.main_chart_view.pan_direction = "x"
             elif self.pan_pop_menu.actions()[1].isChecked():
-                print("y checked")
                 self.main_chart_view.pan_direction = "y"
             else:
                 self.main_chart_view.pan_direction = "both"
