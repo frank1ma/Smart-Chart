@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'plot_navigatorjeATEG.ui'
+## Form generated from reading UI file 'plot_navigatorIAAWER.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.4.3
 ##
@@ -16,7 +16,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
-    QPushButton, QSizePolicy, QToolButton, QWidget)
+    QSizePolicy, QWidget)
 
 from .custom_tool_button import CustomToolButton
 import plot_navigator_rc
@@ -70,7 +70,7 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.pan_view_button)
 
-        self.zoom_button = QPushButton(plot_navigator)
+        self.zoom_button = CustomToolButton(plot_navigator)
         self.zoom_button.setObjectName(u"zoom_button")
         self.zoom_button.setMaximumSize(QSize(36, 16777215))
         icon4 = QIcon()
@@ -80,7 +80,7 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.zoom_button)
 
-        self.series_editor_button = QToolButton(plot_navigator)
+        self.series_editor_button = CustomToolButton(plot_navigator)
         self.series_editor_button.setObjectName(u"series_editor_button")
         self.series_editor_button.setMaximumSize(QSize(36, 16777215))
         icon5 = QIcon()
@@ -90,7 +90,7 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.series_editor_button)
 
-        self.setting_button = QPushButton(plot_navigator)
+        self.setting_button = CustomToolButton(plot_navigator)
         self.setting_button.setObjectName(u"setting_button")
         self.setting_button.setMaximumSize(QSize(36, 16777215))
         icon6 = QIcon()
@@ -100,7 +100,7 @@ class Ui_plot_navigator(object):
 
         self.horizontalLayout.addWidget(self.setting_button)
 
-        self.save_button = QPushButton(plot_navigator)
+        self.save_button = CustomToolButton(plot_navigator)
         self.save_button.setObjectName(u"save_button")
         self.save_button.setMaximumSize(QSize(36, 16777215))
         icon7 = QIcon()

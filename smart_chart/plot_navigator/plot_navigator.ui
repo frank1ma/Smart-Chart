@@ -116,7 +116,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="zoom_button">
+    <widget class="CustomToolButton" name="zoom_button">
      <property name="maximumSize">
       <size>
        <width>36</width>
@@ -136,7 +136,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QToolButton" name="series_editor_button">
+    <widget class="CustomToolButton" name="series_editor_button">
      <property name="maximumSize">
       <size>
        <width>36</width>
@@ -159,7 +159,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="setting_button">
+    <widget class="CustomToolButton" name="setting_button">
      <property name="maximumSize">
       <size>
        <width>36</width>
@@ -179,7 +179,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="save_button">
+    <widget class="CustomToolButton" name="save_button">
      <property name="maximumSize">
       <size>
        <width>36</width>

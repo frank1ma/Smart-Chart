@@ -106,19 +106,24 @@ if __name__ == "__main__":
     window = MainWindow()
     window.setGeometry(800, 400, 800, 600)
     window.show()
-    
+    widget:SmartChart = window.centralWidget()
+    widget.chart_view.sub_chart=None
+    widget.chart_view2.hide()
+
     sys1 = control.tf([10], [1,2,1,1])
     #sys1 = control.zpk([-1,-2,4],[-30,-1,-2,-3],100)
     mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
-    control.nichols(sys1)
-    widget:SmartChart = window.centralWidget()
-    wrapped_phase_degree = widget.chart_view.wrapPhase(phase)
+    sys2 = control.tf([1000], [1,5,5,1])
+    mag1,phase1,omega1 = control.bode_plot(sys2,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
+
+    
+    #wrapped_phase_degree = widget.chart_view.wrapPhase(phase)
     widget.chart_view.plotXY(phase/np.pi*180,20*np.log10(mag))
     widget.chart_view.setNicholsFrequencyData(omega)
-    widget.chart_view.sub_chart=None
-    widget.chart_view2.hide()
-    widget.chart_view.showNicholsGrid()
+    #widget.chart_view.showNicholsGrid()
 
+    widget.chart_view.plotXY(phase1/np.pi*180,20*np.log10(mag1))
+    widget.chart_view.setNicholsFrequencyData(omega1)
 
     # widget.chart_view.plotXY(omega,20*np.log10(mag))
     # #widget.chart_view.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")

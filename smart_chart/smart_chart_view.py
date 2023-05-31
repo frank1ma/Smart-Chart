@@ -88,6 +88,11 @@ class SmartChartView(QChartView):
         self.nichols_frequency_data = None
         self.nichols_frequency_series = None
         self.pan_direction = "both"
+    
+    def updateChartElements(self):
+        self.updateSubChart()
+        self.updateAuxLineMarker()
+        self.updateMarkerText()
 
     def updateDefaultRange(self):
         # update the default range of the axes
@@ -103,8 +108,9 @@ class SmartChartView(QChartView):
         if not legend_visible:
             self.chart().legend().markers(series)[0].setVisible(False)
 
-    def plotXY(self, x, y, series_type="line", series: SmartLineSeries = None):
-        self.setAxesProperty(x, y)
+    def plotXY(self, x, y, series_type="line", series: SmartLineSeries = None,hold_on=False):
+        if not hold_on:
+            self.setAxesProperty(x, y)
         if series is None:
             series = self.addNewSeries(series_type)
         self.updateSeries(series, x, y)
@@ -326,7 +332,7 @@ class SmartChartView(QChartView):
         if self.navigator.ui.vertical_marker_button.isChecked():
             self.updateAllVLM()
         self.setDragMode(QChartView.NoDrag)
-        self.updateSubChart()
+        self.updateChartElements()
         super().mouseReleaseEvent(event)
         QApplication.processEvents()
 
@@ -1291,6 +1297,15 @@ class SmartChartView(QChartView):
 
     def setAxesProperty(self, x_data: Union[list, np.ndarray] = [0.1, 2500], y_data: Union[list, np.ndarray] = [0, 100],
                         x_label: str = "", y_label: str = ""):
+        if hasattr(self,"x_axis") and hasattr(self,"y_axis"):
+            if self.x_axis is not None and self.y_axis is not None:
+                if self.chart().axes() != []:
+                    self.chart().removeAxis(self.x_axis)
+                    self.chart().removeAxis(self.y_axis)
+            # if any series is attached to the axis, remove the series from the axis
+            for series in self.series_dict.values():
+                self.chart().removeSeries(series)
+            self.series_dict.clear()
         # set default x y axes
         if self.plot_type == "bode_mag":
             self.x_axis = QLogValueAxis()
