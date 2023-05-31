@@ -3,9 +3,8 @@ from PySide6.QtWidgets import QApplication,QMainWindow,QMenu,QFrame,QGridLayout
 from PySide6.QtCharts import QChart, QChartView,QLineSeries
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction,QResizeEvent
-from plot_navigator.plot_navigator import PlotNavigator
-from smart_chart_view import SmartChartView
-import control
+from .plot_navigator.plot_navigator import PlotNavigator
+from .smart_chart_view import SmartChartView
 import numpy as np
 
 # create smart chart class as QFrame
@@ -93,47 +92,4 @@ class SmartChart(QFrame):
         
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        # Add the custom frame to the main window
-        #custom_frame = SmartChart(plot_type="bode_mag",sub_plot_type="bode_phase")
-        custom_frame = SmartChart(plot_type="nichols")
-        self.setCentralWidget(custom_frame)
 
-if __name__ == "__main__":
-    app = QApplication([])
-    window = MainWindow()
-    window.setGeometry(800, 400, 800, 600)
-    window.show()
-    widget:SmartChart = window.centralWidget()
-    widget.chart_view.sub_chart=None
-    widget.chart_view2.hide()
-
-    sys1 = control.tf([10], [1,2,1,1])
-    #sys1 = control.zpk([-1,-2,4],[-30,-1,-2,-3],100)
-    mag,phase,omega = control.bode_plot(sys1,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
-    sys2 = control.tf([1000], [1,5,5,1])
-    mag1,phase1,omega1 = control.bode_plot(sys2,dB=True,deg=True,omega_limits=(0.1,2500),omega_num=500,plot=False)
-
-    
-    #wrapped_phase_degree = widget.chart_view.wrapPhase(phase)
-    widget.chart_view.plotXY(phase/np.pi*180,20*np.log10(mag))
-    widget.chart_view.setNicholsFrequencyData(omega)
-    #widget.chart_view.showNicholsGrid()
-
-    widget.chart_view.plotXY(phase1/np.pi*180,20*np.log10(mag1))
-    widget.chart_view.setNicholsFrequencyData(omega1)
-
-    # widget.chart_view.plotXY(omega,20*np.log10(mag))
-    # #widget.chart_view.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")
-    # widget.chart_view.x_axis.setTitleText("Frequency (Hz)")
-    # widget.chart_view.y_axis.setTitleText("Magnitude (dB)")
-    # widget.chart_view2.plotXY(omega,phase/np.pi*180)
-    # #widget.chart_view2.changeAxesType(new_x_axis_type="log",new_y_axis_type="linear")
-    # widget.chart_view2.x_axis.setTitleText("Frequency (Hz)")
-    # widget.chart_view2.y_axis.setTitleText("Phase (deg)")
-    # widget.chart_view.calculateGainMargin(omega,20*np.log10(mag),phase/np.pi*180)
-    # widget.chart_view.showGainMarginMarker(omega,20*np.log10(mag),phase/np.pi*180,True)
-    # a = widget.chart_view.calculatePhaseMargin(omega,20*np.log10(mag),phase/np.pi*180,True)
-    app.exec()

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
     QSizePolicy, QWidget)
 
 from .custom_tool_button import CustomToolButton
-import plot_navigator_rc
+from smart_chart import plot_navigator_rc
 
 class Ui_plot_navigator(object):
     def setupUi(self, plot_navigator):

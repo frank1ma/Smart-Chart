@@ -1,14 +1,15 @@
 from __future__ import annotations
 from typing import Union
-from plot_navigator.plot_navigator import PlotNavigator
-from plot_navigator.measure import Measure, MeasureMarker, PointMarker, VerticalAuxLineMarker, HorizontalAuxLineMarker
+from .plot_navigator.plot_navigator import PlotNavigator
+from .plot_navigator.measure import Measure, MeasureMarker, PointMarker, VerticalAuxLineMarker, HorizontalAuxLineMarker
 from PySide6.QtCharts import QChart, QChartView, QValueAxis, QLineSeries, QScatterSeries, QLogValueAxis, QAbstractAxis
 from PySide6.QtGui import QPainter, QMouseEvent, QWheelEvent, QPen, QAction, QCursor, QFont, QColor
 from PySide6.QtCore import Qt, QPointF
-from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsTextItem, QApplication, QMenu, QColorDialog, QInputDialog
+from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsTextItem, QMenu, QColorDialog, QInputDialog
 import math
 import sys
 import numpy as np
+import time
 
 
 class SmartChartView(QChartView):
@@ -235,7 +236,6 @@ class SmartChartView(QChartView):
             self.updateAuxLineMarker()
             self.updateSubChart()
             self.updateMarkerText()
-            QApplication.processEvents()
 
     def wrapPhase(self, phase: np.ndarray):
         return np.remainder(phase/np.pi*180 + 180, 360) - 180
@@ -311,7 +311,6 @@ class SmartChartView(QChartView):
                     self.createGeneralMenu(chart_point)
 
         super().mousePressEvent(event)
-        QApplication.processEvents()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.LeftButton:
@@ -331,10 +330,10 @@ class SmartChartView(QChartView):
 
         if self.navigator.ui.vertical_marker_button.isChecked():
             self.updateAllVLM()
-        self.setDragMode(QChartView.NoDrag)
+
         self.updateChartElements()
+        self.setDragMode(QChartView.NoDrag)
         super().mouseReleaseEvent(event)
-        QApplication.processEvents()
 
     def mouseMoveEvent(self, event: QMouseEvent):
         # pan the chart if the pan tool is active or the middle mouse button is pressed
@@ -360,13 +359,11 @@ class SmartChartView(QChartView):
         # show the SizeHorCursor when the mouse is near the vertical line
         elif self.navigator.ui.vertical_marker_button.isChecked():
             chart_point_x = self.chart().mapToValue(event.position()).x()
-            if self.vlm_selected is not None:
-                line_start_x = self.vlm_selected.at(0).x()
-                if abs(chart_point_x - line_start_x) < 0.1:  # 10 pixels tolerance
-                    # set mouse cursor to pan cursor
-                    self.setCursor(Qt.CursorShape.SizeHorCursor)
-                else:
-                    self.setCursor(Qt.CursorShape.ArrowCursor)
+            chosen_VLM = self.findNearestVLM(chart_point_x)
+            if chosen_VLM is not None:
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
 
         # show the current mouse position in the position_label of the navigator, 2 decimal places
         else:
@@ -392,11 +389,12 @@ class SmartChartView(QChartView):
         if self.measure_marker_dict != {} and self.moving_measure_marker_text_flag == True:
             chart_point = self.chart().mapToValue(event.position())
             if self.moving_mm is not None:
-                pos = self.moving_mm._convertPointFromChartViewtoViewPort(
-                    chart_point)
-                self.moving_mm.text_item.setPos(pos)
-                self.chart().update()
-                QApplication.processEvents()
+                pos = self.moving_mm._convertPointFromChartViewtoViewPort(chart_point)
+                try:
+                    self.moving_mm.text_item.setPos(pos)
+                    self.chart().update()
+                except:
+                    print("text position error")
 
         if self.nichols_grid is not None and self.nichols_grid_text:
             chart_point = self.chart().mapToValue(event.position())
@@ -412,7 +410,6 @@ class SmartChartView(QChartView):
 
         # call the base class method to allow zooming by rubber band
         super().mouseMoveEvent(event)
-        QApplication.processEvents()
 
     def clearAllIntersectionPoint(self, alm: Union[VerticalAuxLineMarker, HorizontalAuxLineMarker]):
         alm.deletePointMarkers()
@@ -470,6 +467,16 @@ class SmartChartView(QChartView):
         text_position_action = QAction("Change Measure Text Position", self)
         text_position_action.triggered.connect(
             lambda: self.changeMeasureTextPosition(mm))
+        # create menu action to lock the position of measure marker's item text
+        lock_text_position_action = QAction("Lock Measure Text Position", self)
+        lock_text_position_action.triggered.connect(
+            lambda: self.lockMeasureTextPosition(mm))
+        # checkable action
+        lock_text_position_action.setCheckable(True)
+        if mm.text_pos_lock:
+            lock_text_position_action.setChecked(True)
+        else:
+            lock_text_position_action.setChecked(False)
         # create actions for measure type
         horizontal_action = QAction("Horizontal", self)
         horizontal_action.triggered.connect(
@@ -497,6 +504,7 @@ class SmartChartView(QChartView):
         # add actions to menu
         menu.addAction(change_type_action)
         menu.addAction(text_position_action)
+        menu.addAction(lock_text_position_action)
         menu.addAction(change_color_action)
         menu.addAction(delete_action)
         # show menu
@@ -852,7 +860,8 @@ class SmartChartView(QChartView):
                                                                                                 mm.point1_marker.y_value))
             viewport_point2_pos = mm.point2_marker._convertPointFromChartViewtoViewPort(QPointF(mm.point2_marker.x_value,
                                                                                                 mm.point2_marker.y_value))
-            mm.text_item.setPos(viewport_text_pos)
+            if not mm.text_pos_lock:
+                mm.text_item.setPos(viewport_text_pos)
             mm.point1_marker.point_coordinate_label.setPos(viewport_point1_pos)
             mm.point2_marker.point_coordinate_label.setPos(viewport_point2_pos)
 
@@ -1146,9 +1155,13 @@ class SmartChartView(QChartView):
     def changeMeasureTextPosition(self, mm: MeasureMarker):
         self.moving_mm = mm
         self.moving_measure_marker_text_flag = True
+        mm.text_pos_lock = True
+
+    # if lock the text position, it will not be auto updated if chart is paned, zoomed or resized
+    def lockMeasureTextPosition(self, mm: MeasureMarker):
+        mm.text_pos_lock = not mm.text_pos_lock
 
     # change the color of the given vertical line marker
-
     def changeVLMColor(self, vlm: VerticalLineMarker):
         # open a color dialog
         color = QColorDialog.getColor()

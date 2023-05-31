@@ -64,6 +64,7 @@ class MeasureMarker(QLineSeries):
         self.halm1 = None
         self.halm2 = None
         self.text_item = None
+        self.text_pos_lock = False
 
         # add count
         MeasureMarker.isinstance_count += 1
