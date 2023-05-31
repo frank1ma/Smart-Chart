@@ -23,7 +23,7 @@ class SmartChartView(QChartView):
         self.initGraphicsGroup()
         self.initChart()
         self.updateDefaultRange()
-
+        
     def initGraphicsGroup(self):
         # add a dictionario to store all series for data
         self.series_dict = {}
@@ -221,6 +221,23 @@ class SmartChartView(QChartView):
         self.nichols_frequency_series = QLineSeries()
         for index, data in enumerate(frequency_data):
             self.nichols_frequency_series.append(index, data)
+
+    def setDarkMode(self):
+        # set the background of chart to dark
+        self.chart().setBackgroundBrush(QColor(53, 53, 53))
+        # set all the fonts to white
+        self.chart().setTitleBrush(QColor(255, 255, 255))
+        self.chart().legend().setLabelBrush(QColor(255, 255, 255))
+        self.chart().legend().setBrush(QColor(53, 53, 53))
+        self.chart().legend().setPen(QColor(255, 255, 255))
+        self.x_axis.setLabelsBrush(QColor(255, 255, 255))
+        self.x_axis.setTitleBrush(QColor(255, 255, 255))
+        self.x_axis.setLinePen(QColor(255, 255, 255))
+        self.x_axis.setGridLinePen(QColor(255, 255, 255))
+        self.y_axis.setLabelsBrush(QColor(255, 255, 255))
+        self.y_axis.setTitleBrush(QColor(255, 255, 255))
+        self.y_axis.setLinePen(QColor(255, 255, 255))
+        self.y_axis.setGridLinePen(QColor(255, 255, 255))
 
     def wheelEvent(self, event: QWheelEvent):
         if self.navigator.ui.zoom_button.isChecked():
@@ -1150,6 +1167,8 @@ class SmartChartView(QChartView):
             for aux_line in [mm.halm1, mm.halm2, mm.valm1, mm.valm2]:
                 if aux_line is not None:
                     aux_line.setColor(color)
+            # set mm's text item's color
+            mm.text_item.setDefaultTextColor(color)
 
     # change the mesuare marker's item text's position by cursor position
     def changeMeasureTextPosition(self, mm: MeasureMarker):

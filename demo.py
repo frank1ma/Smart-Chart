@@ -57,6 +57,8 @@ if __name__ == "__main__":
 
     widget.chart_view2.x_axis.setTitleText("Frequency (Hz)")
     widget.chart_view2.y_axis.setTitleText("Phase (deg)")
+    #widget.chart_view.setDarkMode()
+    #widget.chart_view2.setDarkMode()
     #widget.chart_view.calculateGainMargin(omega,20*np.log10(mag),phase/np.pi*180)
     #widget.chart_view.showGainMarginMarker(omega,20*np.log10(mag),phase/np.pi*180,True)
     #widget.chart_view.calculatePhaseMargin(omega,20*np.log10(mag),phase/np.pi*180,True)
