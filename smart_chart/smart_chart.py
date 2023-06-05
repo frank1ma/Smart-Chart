@@ -39,8 +39,8 @@ class SmartChart(QFrame):
         self.chart_view2.setupNavigator(self.nav_bar2)
 
         # add subchart to the smart chart
-        self.chart_view.setSubChat(self.chart_view2)
-        self.chart_view2.setSubChat(self.chart_view)
+        #self.chart_view.setSubChat(self.chart_view2)
+        #self.chart_view2.setSubChat(self.chart_view)
 
         #self.chart_view.plotXY([1,2,3],[1,2,3])
     # setup the layout of the smart chart   

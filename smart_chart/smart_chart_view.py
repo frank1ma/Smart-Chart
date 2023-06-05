@@ -109,6 +109,21 @@ class SmartChartView(QChartView):
         if not legend_visible:
             self.chart().legend().markers(series)[0].setVisible(False)
 
+    def appendData(self, series: QLineSeries, point_x:float, point_y:float):
+        series.append(QPointF(point_x, point_y))
+        # find the max y of the series
+        max_y = max([point.y() for point in series.pointsVector()])
+        # find the min y of the series
+        min_y = min([point.y() for point in series.pointsVector()])
+        # find the max x of the series
+        max_x = max([point.x() for point in series.pointsVector()])
+        # find the min x of the series
+        min_x = min([point.x() for point in series.pointsVector()])
+        # update the range of the axes
+        self.x_axis.setRange(min_x, max_x)
+        self.y_axis.setRange(min_y, max_y)
+        self.chart().update()
+
     def plotXY(self, x, y, series_type="line", series: SmartLineSeries = None,hold_on=False):
         if not hold_on:
             self.setAxesProperty(x, y)
