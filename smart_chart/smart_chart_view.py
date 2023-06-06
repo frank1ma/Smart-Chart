@@ -122,6 +122,8 @@ class SmartChartView(QChartView):
         # update the range of the axes
         self.x_axis.setRange(min_x, max_x)
         self.y_axis.setRange(min_y, max_y)
+        self.updateAuxLineMarker()
+        self.updateMarkerText()
         self.chart().update()
 
     def plotXY(self, x, y, series_type="line", series: SmartLineSeries = None,hold_on=False):
@@ -209,7 +211,7 @@ class SmartChartView(QChartView):
     def updateSubChart(self):
         if self.sub_chart is not None:
             if self.subchart_sync_x_axis:
-                self.sub_chart.chart().axisX().setRange(self.x_axis.min(), self.x_axis.max())
+                self.sub_chart.x_axis.setRange(self.x_axis.min(), self.x_axis.max())
                 self.sub_chart.chart().update()
             if self.subchart_sync_y_axis:
                 y_min_percent = (self.y_axis.min(
@@ -218,7 +220,7 @@ class SmartChartView(QChartView):
                 )-self.default_y_range[1])/(self.default_y_range[1]-self.default_y_range[0])
                 sub_y_range = self.sub_chart.default_y_range[1] - \
                     self.sub_chart.default_y_range[0]
-                self.sub_chart.chart().axisY().setRange(sub_y_range*y_min_percent+self.sub_chart.default_y_range[0],
+                self.sub_chart.y_axis.setRange(sub_y_range*y_min_percent+self.sub_chart.default_y_range[0],
                                                         sub_y_range*y_max_percent+self.sub_chart.default_y_range[1])
                 self.sub_chart.chart().update()
             self.sub_chart.updateAuxLineMarker()
@@ -1252,9 +1254,9 @@ class SmartChartView(QChartView):
             alm.deletePointMarkers()
 
     # update the position of all vertical line marker in self.vertical_marker_dict
-    def updateAllVLM(self):
+    def updateAllVLM(self,circular_marker_hide=False,text_not_update=False):
         for vlm in self.vertical_marker_dict.values():
-            vlm.updateVLM(vlm.last_vertical_line_x_pos)
+            vlm.updateVLM(vlm.last_vertical_line_x_pos,circular_marker_hide,text_not_update)
 
     # hide all vertical line markers' circles
     def hideAllVLMCircle(self):
@@ -1904,7 +1906,7 @@ class VerticalLineMarker(QLineSeries):
         self.vlm_circle.setVisible(True)
         self.text_item.setVisible(True)
 
-    def updateVLM(self, x_value: float):
+    def updateVLM(self, x_value: float, circular_marker_hide=False,text_not_update = False):
         # get min and max of the self.chart().axisY()
         min_y = self.chart_view.chart().axisY().min()
         max_y = self.chart_view.chart().axisY().max()
@@ -1927,13 +1929,18 @@ class VerticalLineMarker(QLineSeries):
         self.append(x_value, max_y)
         self.last_vertical_line_x_pos = x_value
         self.last_vertical_line_x_percent = (x_value-min_x) / (max_x-min_x)
-        # set the position of the circle to top of the vertical line
-        top_point_viewport_position = self._convertPointFromChartViewtoViewPort(
-            QPointF(x_value, max_y))
-        self.vlm_circle.setPos(top_point_viewport_position.x()-self.vlm_circle_radius,
-                               top_point_viewport_position.y()-self.vlm_circle_radius)
-        # show the vertical line marker
-        self.showVLM()
+        if not circular_marker_hide:
+            # set the position of the circle to top of the vertical line
+            top_point_viewport_position = self._convertPointFromChartViewtoViewPort(
+                QPointF(x_value, max_y))
+            self.vlm_circle.setPos(top_point_viewport_position.x()-self.vlm_circle_radius,
+                                top_point_viewport_position.y()-self.vlm_circle_radius)
+            # show the vertical line marker
+            self.showVLM()
+        else:
+            self.setVisible(True)
+            self.vlm_circle.setVisible(False)
+            self.text_item.setVisible(True)
 
         # interpolate y value and show (x,y) in the text item
         y_value, ratio, i = self._interpolate_y_value(self.series, x_value)
@@ -1942,15 +1949,17 @@ class VerticalLineMarker(QLineSeries):
                 self.chart_view.nichols_frequency_series, i, ratio)
         if y_value is not None:
             if self.chart_view.plot_type == "nichols" and ratio is not None and self.chart_view.nichols_frequency_series is not None:
-                self.text_item.setPlainText(
-                    f"({x_value:.2f},{y_value:.2f}),freq:{freq_y_value:.2f}")
+                if not text_not_update:
+                    self.text_item.setPlainText(
+                        f"({x_value:.2f},{y_value:.2f}),freq:{freq_y_value:.2f}")
             else:
-                self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f})")
-            text_pos = self.chart().mapToPosition(QPointF(x_value, y_value)) + \
-                QPointF(10, -20)  # Adjust the offset as needed
+                if not text_not_update:
+                    self.text_item.setPlainText(f"({x_value:.2f},{y_value:.2f})")
+            text_pos = self.chart().mapToPosition(QPointF(x_value, y_value)) + QPointF(10, -20)  # Adjust the offset as needed
             self.text_item.setPos(text_pos)
         else:
-            self.text_item.setPlainText("")
+            if not text_not_update:
+                self.text_item.setPlainText("")
 
     def setExtended(self, vlm: VerticalLineMarker):
         self.extended = True
