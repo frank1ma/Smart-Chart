@@ -77,8 +77,8 @@ class SmartChartView(QChartView):
         self.is_point_near_threshold_x = 0.1
         self.is_point_near_threshold_y = 0.1
         self.interpolated_series_step = 0.01
-        self.pan_x_sensitivity = 0.5
-        self.pan_y_sensitivity = 0.5
+        self.pan_x_sensitivity = 0.05
+        self.pan_y_sensitivity = 0.005
         self.zoom_in_level = 1.1
         self.last_highlighted_alm = None
         self.subchart_sync_x_axis = True
@@ -269,7 +269,8 @@ class SmartChartView(QChartView):
             # if dict has a vertical line marker, hide it
             if len(self.vertical_marker_dict) != 0:
                 self.hideAllVLMCircle()
-            chart_point = self.chart().mapToValue(event.position())
+            #chart_point = self.chart().mapToValue(event.position())
+            chart_point = event.position()
             self.last_mouse_pos = chart_point
 
         elif event.button() == Qt.LeftButton and self.navigator.ui.vertical_marker_button.isChecked():
@@ -836,38 +837,40 @@ class SmartChartView(QChartView):
 
     # pan the chart by the given event
     def panChart(self, event: QMouseEvent,direction:str="both"):
-        # convert the mouse position to a chart point
-        chart_point = self.chart().mapToValue(event.position())
+
+        #chart_point = self.chart().mapToValue(event.position())
+        chart_point = event.position()
         # pan the chart by the difference between the last mouse position and the current mouse position
         try:
             delta = chart_point - self.last_mouse_pos
         except:
             print("wrong point for pan")
             return
-        # the pan sensitivity is inversely proportional to the zoom level
-        if self.default_x_range[1] == 0:
-            zoom_level_x = 1
-        else:
-            zoom_level_x = abs(self.x_axis.max()) / \
-                abs(self.default_x_range[1])
-        if self.default_y_range[1] == 0:
-            zoom_level_y = 1
-        else:
-            zoom_level_y = abs(self.y_axis.max()) / \
-                abs(self.default_y_range[1])
+        # # the pan sensitivity is inversely proportional to the zoom level
+        # if self.default_x_range[1] == 0:
+        #     zoom_level_x = 1
+        # else:
+        #     zoom_level_x = abs(self.x_axis.max()) / \
+        #         abs(self.default_x_range[1])
+        # if self.default_y_range[1] == 0:
+        #     zoom_level_y = 1
+        # else:
+        #     zoom_level_y = abs(self.y_axis.max()) / \
+        #         abs(self.default_y_range[1])
+        zoom_level_x = 1
+        zoom_level_y = 1
         # pan the chart
         if direction == "both":
             self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x) *
-                                delta.x(), -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
+                                delta.x(), self.pan_y_sensitivity/(zoom_level_y)*delta.y())
         elif direction == "x":
-            self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x) *
-                                delta.x(), 0)
+            self.chart().scroll(-self.pan_x_sensitivity/(zoom_level_x) *delta.x(), 0)
+            #self.chart().scroll(-self.pan_x_sensitivity * delta.x(), 0)
         elif direction == "y":
-            self.chart().scroll(0, -self.pan_y_sensitivity/(zoom_level_y)*delta.y())
+            self.chart().scroll(0, self.pan_y_sensitivity/(zoom_level_y)*delta.y())
         self.updateSubChart()
         self.updateMarkerText()
         self.updateAuxLineMarker()
-
     def updateMarkerText(self):
         # pan all the text item together with the chart
         for mm in self.measure_marker_dict.values():
